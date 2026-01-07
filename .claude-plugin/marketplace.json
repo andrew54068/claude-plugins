@@ -1,0 +1,15 @@
+{
+  "name": "claude-skills",
+  "owner": {
+    "name": "Dawson",
+    "email": "andrew0424718012@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "permission-guardian",
+      "source": "./permission-guardian",
+      "description": "Analyzes project and generates Claude Code permissions for detected tech stacks",
+      "version": "0.1.0"
+    }
+  ]
+}
