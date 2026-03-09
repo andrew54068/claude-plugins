@@ -10,33 +10,25 @@ A collection of Claude Code plugins. Each plugin can be installed independently.
 | [browser-mcp-selector](./browser-mcp-selector) | Selects the best browser MCP tool for a given task |
 | [security-scan](./security-scan) | 6-agent parallel security scanner for malicious code, credential leaks, and prompt injection |
 
-## Install All Plugins
+## Install
+
+Add the marketplace, then install plugins:
 
 ```bash
-claude plugin add https://github.com/andrew54068/claude-plugins
-```
+# Add the marketplace
+/plugin marketplace add https://github.com/andrew54068/claude-plugins
 
-## Install Individually
-
-Each plugin has its own `.claude-plugin/` directory and can be installed on its own:
-
-```bash
-# Permission Guardian
-claude plugin add https://github.com/andrew54068/claude-plugins/tree/main/permission-guardian
-
-# Browser MCP Selector
-claude plugin add https://github.com/andrew54068/claude-plugins/tree/main/browser-mcp-selector
-
-# Security Scan
-claude plugin add https://github.com/andrew54068/claude-plugins/tree/main/security-scan
+# Install individual plugins
+/plugin install permission-guardian@andrew54068
+/plugin install browser-mcp-selector@andrew54068
+/plugin install security-scan@andrew54068
 ```
 
 Or from a local path:
 
 ```bash
-claude plugin add /path/to/claude-plugins/permission-guardian
-claude plugin add /path/to/claude-plugins/browser-mcp-selector
-claude plugin add /path/to/claude-plugins/security-scan
+/plugin marketplace add /path/to/claude-plugins
+/plugin install permission-guardian@andrew54068
 ```
 
 ## License
