@@ -1,0 +1,20 @@
+{
+  "name": "security-scan",
+  "version": "1.0.0",
+  "description": "Comprehensive 6-agent parallel security scanner for Claude Code. Detects malicious code, credential leaks, data exfiltration, supply chain risks, and prompt injection attacks.",
+  "author": {
+    "name": "Dawson"
+  },
+  "repository": "https://github.com/andrew54068/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "security",
+    "scanning",
+    "credentials",
+    "secrets",
+    "malware",
+    "prompt-injection",
+    "supply-chain",
+    "code-audit"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "name": "security-scan",
+  "owner": {
+    "name": "Dawson",
+    "url": "https://github.com/andrew54068"
+  },
+  "plugins": [
+    {
+      "name": "security-scan",
+      "source": "./",
+      "description": "Comprehensive 6-agent parallel security scanner for Claude Code. Detects malicious code, credential leaks, data exfiltration, supply chain risks, and prompt injection attacks.",
+      "version": "1.0.0"
+    }
+  ]
+}

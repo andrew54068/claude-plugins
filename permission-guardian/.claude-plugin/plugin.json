@@ -1,0 +1,17 @@
+{
+  "name": "permission-guardian",
+  "version": "0.1.0",
+  "description": "Analyzes project and generates Claude Code permissions for detected tech stacks.",
+  "author": {
+    "name": "Dawson"
+  },
+  "repository": "https://github.com/andrew54068/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "permissions",
+    "security",
+    "settings",
+    "tech-stack",
+    "configuration"
+  ]
+}

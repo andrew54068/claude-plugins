@@ -2,14 +2,26 @@
   "name": "claude-plugins",
   "owner": {
     "name": "Dawson",
-    "email": "andrew0424718012@gmail.com"
+    "url": "https://github.com/andrew54068"
   },
   "plugins": [
     {
       "name": "permission-guardian",
       "source": "./permission-guardian",
-      "description": "Analyzes project and generates Claude Code permissions for detected tech stacks",
+      "description": "Analyzes project and generates Claude Code permissions for detected tech stacks.",
       "version": "0.1.0"
+    },
+    {
+      "name": "browser-mcp-selector",
+      "source": "./browser-mcp-selector",
+      "description": "Selects the best browser MCP tool for a given task based on requirements like cross-browser support, debugging depth, performance analysis, and login state needs.",
+      "version": "1.0.0"
+    },
+    {
+      "name": "security-scan",
+      "source": "./security-scan",
+      "description": "Comprehensive 6-agent parallel security scanner for Claude Code. Detects malicious code, credential leaks, data exfiltration, supply chain risks, and prompt injection attacks.",
+      "version": "1.0.0"
     }
   ]
 }

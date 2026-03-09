@@ -1,0 +1,19 @@
+{
+  "name": "browser-mcp-selector",
+  "version": "1.0.0",
+  "description": "Selects the best browser MCP tool for a given task based on requirements like cross-browser support, debugging depth, performance analysis, and login state needs.",
+  "author": {
+    "name": "Dawson"
+  },
+  "repository": "https://github.com/andrew54068/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "browser",
+    "mcp",
+    "chrome-devtools",
+    "playwright",
+    "automation",
+    "debugging",
+    "testing"
+  ]
+}
