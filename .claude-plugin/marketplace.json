@@ -1,5 +1,5 @@
 {
-  "name": "claude-plugins",
+  "name": "andrew54068",
   "owner": {
     "name": "Dawson",
     "url": "https://github.com/andrew54068"
@@ -15,13 +15,13 @@
       "name": "browser-mcp-selector",
       "source": "./browser-mcp-selector",
       "description": "Selects the best browser MCP tool for a given task based on requirements like cross-browser support, debugging depth, performance analysis, and login state needs.",
-      "version": "1.0.0"
+      "version": "0.1.0"
     },
     {
       "name": "security-scan",
       "source": "./security-scan",
       "description": "Comprehensive 6-agent parallel security scanner for Claude Code. Detects malicious code, credential leaks, data exfiltration, supply chain risks, and prompt injection attacks.",
-      "version": "1.0.0"
+      "version": "0.1.0"
     }
   ]
 }
