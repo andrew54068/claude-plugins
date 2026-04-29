@@ -22,6 +22,12 @@
       "source": "./security-scan",
       "description": "Comprehensive 6-agent parallel security scanner for Claude Code. Detects malicious code, credential leaks, data exfiltration, supply chain risks, and prompt injection attacks.",
       "version": "0.1.0"
+    },
+    {
+      "name": "skills-manager",
+      "source": "./skills-manager",
+      "description": "Manage per-project skills, plugins, and MCP servers via a bullpen + symlink pattern. Vendor-neutral path (~/.agents/) works for both Claude Code and Codex.",
+      "version": "0.1.0"
     }
   ]
 }

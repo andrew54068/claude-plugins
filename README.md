@@ -9,6 +9,7 @@ A collection of Claude Code plugins. Each plugin can be installed independently.
 | [permission-guardian](./permission-guardian) | Detects tech stacks and generates Claude Code permission configurations |
 | [browser-mcp-selector](./browser-mcp-selector) | Selects the best browser MCP tool for a given task |
 | [security-scan](./security-scan) | 6-agent parallel security scanner for malicious code, credential leaks, and prompt injection |
+| [skills-manager](./skills-manager) | Manage per-project skills, plugins, and MCP servers via a bullpen + symlink pattern (Claude + Codex) |
 
 ## Install
 
@@ -22,6 +23,7 @@ Add the marketplace, then install plugins:
 /plugin install permission-guardian@andrew54068
 /plugin install browser-mcp-selector@andrew54068
 /plugin install security-scan@andrew54068
+/plugin install skills-manager@andrew54068
 ```
 
 Or from a local path:
