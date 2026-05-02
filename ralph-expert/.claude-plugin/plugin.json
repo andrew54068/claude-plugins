@@ -1,0 +1,19 @@
+{
+  "name": "ralph-expert",
+  "version": "0.1.0",
+  "description": "Turn vague task ideas into well-structured Ralph Loop prompts. Generates completion criteria, suggests max iteration limits, builds the full prompt, previews it, then launches the ralph-loop with safety nets.",
+  "author": {
+    "name": "Dawson"
+  },
+  "repository": "https://github.com/andrew54068/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "ralph",
+    "ralph-loop",
+    "iteration",
+    "automation",
+    "prompt-engineering",
+    "task-runner",
+    "agent-loop"
+  ]
+}

@@ -28,6 +28,12 @@
       "source": "./skills-manager",
       "description": "Manage per-project skills, plugins, and MCP servers via a bullpen + symlink pattern. Vendor-neutral path (~/.agents/) works for both Claude Code and Codex.",
       "version": "0.1.0"
+    },
+    {
+      "name": "ralph-expert",
+      "source": "./ralph-expert",
+      "description": "Turn vague task ideas into well-structured Ralph Loop prompts. Generates completion criteria, suggests iteration limits, previews the full prompt, then launches the ralph-loop with safety nets. Requires the ralph-loop plugin.",
+      "version": "0.1.0"
     }
   ]
 }
