@@ -34,6 +34,12 @@
       "source": "./ralph-expert",
       "description": "Turn vague task ideas into well-structured Ralph Loop prompts. Generates completion criteria, suggests iteration limits, previews the full prompt, then launches the ralph-loop with safety nets. Requires the ralph-loop plugin.",
       "version": "0.1.0"
+    },
+    {
+      "name": "open-source-prep",
+      "source": "./open-source-prep",
+      "description": "Prepare a private codebase for safe open-source release with secret scanning, license guidance, and standard repository documentation.",
+      "version": "0.1.0"
     }
   ]
 }

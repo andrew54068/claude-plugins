@@ -1,0 +1,59 @@
+# --- Secrets & local config (NEVER commit) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+*.keystore
+*.jks
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+*.ppk
+.npmrc
+.pypirc
+.netrc
+credentials
+*.pgpass
+secrets.*
+*secret*.json
+serviceaccount*.json
+*-key.json
+gcloud-*.json
+
+# --- OS / editor cruft ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# --- Logs & temp ---
+*.log
+logs/
+tmp/
+temp/
+*.tmp
+*.bak
+
+# --- Common build / dependency output (uncomment what applies) ---
+# node_modules/
+# dist/
+# build/
+# .next/
+# __pycache__/
+# *.pyc
+# .venv/
+# venv/
+# target/
+# vendor/
+# coverage/
+# .cache/

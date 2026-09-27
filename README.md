@@ -11,6 +11,7 @@ A collection of Claude Code plugins. Each plugin can be installed independently.
 | [security-scan](./security-scan) | 6-agent parallel security scanner for malicious code, credential leaks, and prompt injection |
 | [skills-manager](./skills-manager) | Manage per-project skills, plugins, and MCP servers via a bullpen + symlink pattern (Claude + Codex) |
 | [ralph-expert](./ralph-expert) | Turn a vague task into a well-structured Ralph Loop prompt with completion criteria and a max-iteration safety net (requires the `ralph-loop` plugin) |
+| [open-source-prep](./open-source-prep) | Prepare a private codebase for safe open-source release with secret scanning, license guidance, and standard repository documentation |
 
 ## Install
 
@@ -26,6 +27,7 @@ Add the marketplace, then install plugins:
 /plugin install security-scan@andrew54068
 /plugin install skills-manager@andrew54068
 /plugin install ralph-expert@andrew54068
+/plugin install open-source-prep@andrew54068
 ```
 
 Or from a local path:

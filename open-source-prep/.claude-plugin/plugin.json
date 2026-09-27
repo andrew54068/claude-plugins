@@ -1,0 +1,17 @@
+{
+  "name": "open-source-prep",
+  "version": "0.1.0",
+  "description": "Prepare a private codebase for safe open-source release with secret scanning, license guidance, and standard repository documentation.",
+  "author": {
+    "name": "Dawson"
+  },
+  "repository": "https://github.com/andrew54068/claude-plugins",
+  "license": "MIT",
+  "keywords": [
+    "open-source",
+    "security",
+    "secret-scanning",
+    "licensing",
+    "repository-preparation"
+  ]
+}
