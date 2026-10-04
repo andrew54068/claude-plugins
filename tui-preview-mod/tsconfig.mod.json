@@ -1,0 +1,5 @@
+{
+  "extends": "./.claude-plugin/types/tsconfig.json",
+  "compilerOptions": { "allowImportingTsExtensions": true },
+  "include": ["hooks/register.ts", "hooks/protocol.ts", "hooks/player.ts", "tests/register.test.ts"]
+}

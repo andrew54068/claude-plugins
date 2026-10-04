@@ -1,0 +1,4 @@
+{
+  "description": "原生終端預覽介面",
+  "modules": ["./register.ts"]
+}

@@ -1,0 +1,7 @@
+node_modules
+dist/
+.claude-plugin/types/
+**/.claude-plugin/types/
+.superpowers/
+.lavish/
+*.log

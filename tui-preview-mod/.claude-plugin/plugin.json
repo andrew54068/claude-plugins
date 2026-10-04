@@ -1,0 +1,13 @@
+{
+  "name": "tui-preview-mod",
+  "version": "0.1.2",
+  "description": "在 Claude Code 終端預覽 Markdown、圖片、影片與送出前的貼圖",
+  "author": { "name": "Dawson" },
+  "homepage": "https://github.com/andrew54068/claude-plugins/tree/main/tui-preview-mod",
+  "repository": "https://github.com/andrew54068/claude-plugins",
+  "license": "MIT",
+  "userConfig": {
+    "roots": { "type": "string", "multiple": true, "title": "額外預覽目錄", "description": "工作階段根目錄以外可讀取的絕對路徑", "default": [] },
+    "autoPreview": { "type": "boolean", "title": "自動圖片預覽", "description": "顯示 Read 圖片與送出前的貼圖", "default": true }
+  }
+}
