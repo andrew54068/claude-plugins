@@ -1,0 +1,23 @@
+{
+  "name": "claude-code-preview-mod",
+  "version": "0.1.2",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/andrew54068/claude-plugins.git",
+    "directory": "tui-preview-mod"
+  },
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --import tsx --test tests/*.test.mjs tests/player.test.mts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "check": "yarn typecheck && yarn test"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.4",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
+  }
+}

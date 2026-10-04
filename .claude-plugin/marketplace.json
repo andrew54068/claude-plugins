@@ -40,6 +40,13 @@
       "source": "./open-source-prep",
       "description": "Prepare a private codebase for safe open-source release with secret scanning, license guidance, and standard repository documentation.",
       "version": "0.1.0"
+    },
+    {
+      "name": "tui-preview-mod",
+      "source": "./tui-preview-mod",
+      "description": "在 Claude Code 終端預覽 Markdown、圖片、無聲影片與送出前的貼圖。",
+      "version": "0.1.2",
+      "license": "MIT"
     }
   ]
 }
