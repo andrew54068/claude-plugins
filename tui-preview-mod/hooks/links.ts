@@ -4,6 +4,7 @@
 
 const EXTENSIONS = 'png|jpe?g|webp|gif|mp4|mov|webm|mkv';
 const MEDIA = new RegExp(`\\.(?:${EXTENSIONS})$`, 'i');
+const MENTION = new RegExp(`\\.(?:${EXTENSIONS})(?!\\w)`, 'i');
 const CONTROL = /[\u0000-\u001f\u007f]/;
 const SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
 const EMAIL = /^[\w.+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/;
@@ -130,4 +131,9 @@ export function linkifyMediaPaths(markdown: string, root: string, extraRoots: re
   });
   const text = lines.join('\n');
   return links.size && !keepsCore && text.length <= MAX_TEXT ? { text, links } : undefined;
+}
+
+// Whether a reply could name a media file at all: the cheap test before any linkify work.
+export function mentionsMedia(text: string) {
+  return MENTION.test(text);
 }

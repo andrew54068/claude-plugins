@@ -2,7 +2,7 @@ import type { CoreEngineInterface, HookStream, ProcessSpawnChunk, ProcessSpawnRe
 import { NdjsonParser } from './protocol.ts';
 import type { HeaderRecord, FrameRecord, MarkdownRecord } from './protocol.ts';
 import { Player } from './player.ts';
-import { linkifyMediaPaths, pathFromHref } from './links.ts';
+import { linkifyMediaPaths, mentionsMedia, pathFromHref } from './links.ts';
 
 type Api = CoreEngineInterface;
 type Job = { stream: HookStream<ProcessSpawnChunk, ProcessSpawnResult>; stopped: boolean; stopping?: Promise<void> };
@@ -30,6 +30,7 @@ const time = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.flo
   let pane: View | undefined;
   let attachments = new Map<number, Attachment>();
   let snapshot: Attachment[] = [];
+  let shownBand = '';
   const inline = new Map<string, { data: string; view: View }>();
   const jobs = new Set<Job>();
   const automaticQueue: AutomaticTask[] = [];
@@ -62,7 +63,7 @@ const time = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.flo
     paneOperation++;
     polling?.cancel(); polling = undefined;
     pane?.player?.close(); pane = undefined;
-    attachments.clear(); snapshot = []; sessionKey = ''; inline.clear();
+    attachments.clear(); snapshot = []; sessionKey = ''; shownBand = ''; inline.clear();
     automaticQueue.length = 0; attemptedReads.clear();
     const closing = [...jobs];
     await Promise.all(closing.map(stopJob));
@@ -273,7 +274,9 @@ const time = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.flo
           () => own === epoch && automatic && sessionKey === key && attachments.get(number) === item);
       }
       if (ids.length) snapshot = ids.map(number => attachments.get(number)!);
-      redraw($);
+      // Redraw only when the pasted-image band would change: a redraw re-runs every reply row too.
+      const band = [...attachments.values()].map(item => `${item.id}${item.view.frame ? 'f' : ''}${item.view.job ? 'j' : ''}${item.view.error ? 'e' : ''}`).join(' ');
+      if (band !== shownBand) { shownBand = band; redraw($); }
     } catch { /* No clipboard/history fallback; retry the current snapshot next tick. */ }
     finally { pollBusy = false; }
   }
@@ -409,9 +412,10 @@ export const register: Register = (on, configuration) => {
   });
   // A reply naming media paths is redrawn with those paths as links this Mod answers on a plain
   // click; the stored message and the model's input stay as they were, and nothing is read until then.
-  // Only the fullscreen layout reports clicks, so the main screen keeps core's drawing untouched.
+  // Only the fullscreen layout reports clicks, so the main screen keeps core's drawing untouched; a reply
+  // naming no media file gets core's drawing before any engine call.
   on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
-    if (e.surface !== 'terminal' || e.viewport?.isFullscreen !== true || !interactive || !clickable || resetting) return next(e);
+    if (e.surface !== 'terminal' || e.viewport?.isFullscreen !== true || !interactive || !clickable || resetting || !mentionsMedia(e.props.text)) return next(e);
     const renderingEpoch = epoch;
     const root = await $.session.root();
     const reply = renderingEpoch === epoch ? linkifyMediaPaths(e.props.text, root, extraRoots()) : undefined;

@@ -14,10 +14,10 @@ const readRow = (id: string) => ({ plugin: PLUGIN, surface: 'terminal', componen
 
 function host(on: On) {
   const clock = mock.clock(on);
-  const state = { draft: '', root: '/work', id: '60b13e72-306e-406f-86c5-f5541ef749f5', reads: 0, requests: [] as ProcessSpawnRequest[], calls: [] as string[][], commands: [] as unknown[], blits: [] as unknown[], invalidations: 0, stopped: 0, videoDuration: 5, badExit: false, badRecord: false, blitDenied: false, imageDelay: 0, inspectDelay: 0, activeImages: 0, peakImages: 0, activeVideo: 0, initialVideoTime: 0, videoFrameTime: undefined as number | undefined, returnDelay: 0, opened: 0, renderDelay: 0 };
+  const state = { draft: '', root: '/work', id: '60b13e72-306e-406f-86c5-f5541ef749f5', reads: 0, roots: 0, requests: [] as ProcessSpawnRequest[], calls: [] as string[][], commands: [] as unknown[], blits: [] as unknown[], invalidations: 0, stopped: 0, videoDuration: 5, badExit: false, badRecord: false, blitDenied: false, imageDelay: 0, inspectDelay: 0, activeImages: 0, peakImages: 0, activeVideo: 0, initialVideoTime: 0, videoFrameTime: undefined as number | undefined, returnDelay: 0, opened: 0, renderDelay: 0 };
   on('session.start', () => ({ cwd: '/work' }));
   on('session.end', () => ({ sessionId: state.id }));
-  on('session.root', () => ({ value: state.root }));
+  on('session.root', () => { state.roots++; return { value: state.root }; });
   on('session.id', () => ({ value: state.id }));
   on('prompt.read', () => { state.reads++; return { value: { text: state.draft, cursor: state.draft.length } }; });
   on('command.register', ($, e) => { state.commands.push(e); return { value: { command: e.name } }; });
@@ -494,6 +494,25 @@ test('clickablePaths off keeps every reply core-drawn', { options: { clickablePa
   const ui = await $.ui.mount(reply('Saved `content/a.png`.'));
   expect(await ui.find({ type: 'Text', text: '原生輸出' })).toBeDefined();
   expect(await ui.find({ type: 'Markdown' })).toBeUndefined();
+  await ui.unmount();
+});
+
+test('an idle composer poll redraws nothing, so reply rows are not re-run every half second', async ($, on) => {
+  const { clock, state } = host(on);
+  await $.session.start(START);
+  await clock.advance(600);
+  const before = state.invalidations;
+  await clock.advance(5_000);
+  expect(state.reads).toBeGreaterThan(5);
+  expect(state.invalidations).toBe(before);
+});
+
+test('a reply naming no media file is answered before any engine call', { options: { autoPreview: false } }, async ($, on) => {
+  const { state } = host(on);
+  await $.session.start(START);
+  const ui = await $.ui.mount(reply('All done; notes in docs/readme.md, cover.pngx and a/b.png_old'));
+  expect(await ui.find({ type: 'Text', text: '原生輸出' })).toBeDefined();
+  expect(state.roots).toBe(0);
   await ui.unmount();
 });
 

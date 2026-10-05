@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { MAX_LINKS, fileHref, linkifyMediaPaths, pathFromHref } from '../hooks/links.js';
+import { MAX_LINKS, fileHref, linkifyMediaPaths, mentionsMedia, pathFromHref } from '../hooks/links.js';
 
 const ROOT = '/work';
 const linked = (text: string, roots: string[] = []) => linkifyMediaPaths(text, ROOT, roots);
@@ -113,4 +113,10 @@ test('a reply with a link the redraw could not keep clickable falls back to the 
 
 test('retina-style filenames with @ link as one path', () => {
   assert.deepEqual([...linked('Exported content/icon@2x.png and `assets/logo@3x.png`.')!.links.values()], ['/work/content/icon@2x.png', '/work/assets/logo@3x.png']);
+});
+
+test('only text naming a media extension is worth linkifying', () => {
+  assert.ok(mentionsMedia('see content/a.PNG.'));
+  assert.ok(mentionsMedia('clip/w.mp4了'));
+  assert.equal(mentionsMedia('a.pngx, notes.md, image.png_old'), false);
 });
