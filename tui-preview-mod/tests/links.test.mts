@@ -70,7 +70,7 @@ test('one href per path, at most MAX_LINKS, and text over 10000 characters falls
 });
 
 test('long unbroken tokens are scanned in linear time', () => {
-  for (const text of ['a.'.repeat(4_900), 'a'.repeat(9_900), `${'ab/'.repeat(3_200)}x.png`]) {
+  for (const text of ['a.'.repeat(4_900), 'a'.repeat(9_900), `${'ab/'.repeat(3_200)}x.png`, `${'['.repeat(9_980)} a/b.png`, `${'<'.repeat(9_980)} a/b.png`, `${'a+'.repeat(4_980)} a/b.png`, `${'`'.repeat(9_980)} a/b.png`]) {
     const start = performance.now();
     linked(text);
     assert.ok(performance.now() - start < 100, `${text.slice(0, 6)}… took ${(performance.now() - start).toFixed(0)}ms`);
@@ -82,4 +82,35 @@ test('a reference definition keeps its shape and points the reference at the fil
   assert.equal(reply?.text, 'See [the shot][1] and [web][2].\n\n[1]: file:///work/docs/a.png "Cover"\n[2]: https://x.dev/b.png');
   assert.deepEqual([...reply!.links.values()], ['/work/docs/a.png']);
   assert.equal(linked('[1]: notes/readme.md'), undefined);
+});
+
+test('code fences nested in list items and blockquotes stay as written', () => {
+  assert.equal(linked('1. Run:\n   - this:\n     ```sh\n     open content/a.png\n     ```\n2. Done'), undefined);
+  assert.equal(linked('10. Step\n    ```\n    open content/a.png\n    ```'), undefined);
+  assert.equal(linked('> ```\n> open content/a.png\n> ```'), undefined);
+  assert.equal(linked('- Run:\n  ```\n  open a/x.png\n  ```\n- then see a/y.png')?.text, '- Run:\n  ```\n  open a/x.png\n  ```\n- then see [a/y.png](file:///work/a/y.png)');
+});
+
+test('a definition-shaped line inside a paragraph or with trailing prose is linked as prose', () => {
+  assert.equal(linked('Files:\n[cover]: content/a.png')?.text, 'Files:\n[cover]: [content/a.png](file:///work/content/a.png)');
+  assert.equal(linked('[note]: content/a.png is the cover')?.text, '[note]: [content/a.png](file:///work/content/a.png) is the cover');
+  assert.equal(linked('[1]: a/x.png\n[2]: <a/y.png> (Second)')?.text, '[1]: file:///work/a/x.png\n[2]: file:///work/a/y.png (Second)');
+});
+
+test('www. web links, titled links, escaped and nested brackets are not corrupted', () => {
+  assert.equal(linked('See www.example.com/e.png and https://www.x.dev/f.png'), undefined);
+  assert.equal(linked('[x](content/a.png "The cover")')?.text, '[x](file:///work/content/a.png "The cover")');
+  assert.equal(linked('[a [b] c](content/a.png), \\[x](content/b.png), [![alt](a.png)](b/c.png)'), undefined);
+  assert.equal(linked('\\\\[x](content/b.png)')?.text, '\\\\[x](file:///work/content/b.png)');
+});
+
+test('a reply with a link the redraw could not keep clickable falls back to the native drawing', () => {
+  for (const other of ['[open](vscode://file/work/a.ts)', '[說明](文件/說明.md)', '<obsidian://open?vault=x>', '\n\n[1]: mailto:a@b.dev', 'or write to a.b@x.dev']) {
+    assert.equal(linked(`See content/a.png and ${other}`), undefined, other);
+  }
+  assert.ok(linked('See content/a.png and [docs](docs/readme.md), [web](https://x.dev), [here](./a.md)'));
+});
+
+test('retina-style filenames with @ link as one path', () => {
+  assert.deepEqual([...linked('Exported content/icon@2x.png and `assets/logo@3x.png`.')!.links.values()], ['/work/content/icon@2x.png', '/work/assets/logo@3x.png']);
 });
