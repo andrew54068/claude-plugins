@@ -15,9 +15,9 @@
 - 點選前不讀檔。點選後一樣經過 `media.mjs` 的 root、檔案類型、大小檢查；Mod 端的 root 比對只決定要不要畫成連結。
 - 已儲存的訊息、模型輸入與 Read 結果都不變；沒有新增模型請求或上傳。
 - 只在全螢幕介面、且 Claude Code 會畫可點選連結的終端重畫（Ghostty、iTerm2、WezTerm、kitty 等，判斷比照 2.1.289）。主畫面、Terminal.app 與未設 `FORCE_HYPERLINK=1` 的 herdr 照原生繪製。工作階段開始時讀 10 個終端識別環境變數，清單見 [SECURITY](../SECURITY.md)。
-- 回覆若含重畫後無法點選的連結（`vscode://`、`mailto:`、Email、非 ASCII 開頭的相對連結），整則照原生繪製。
+- 回覆若含重畫後無法點選的連結（`vscode://`、`mailto:`、Email，以及第一段含其他字元的相對連結，例如 `筆記.md`、`my%20file.md`），整則照原生繪製。沒有資料夾的 `icon@2x.png` 會被 Claude Code 當成 Email 連結，這樣的回覆也照原生繪製。
 - 超過 10000 字元照原生繪製；超過 256 個不同路徑時，其餘路徑維持純文字。
-- 程式碼區塊（含清單與引用中的）、網址（含 `www.`）、圖片語法、跳脫的括號與 `~/` 路徑不轉換。參考式連結的定義只改目的地；段落中形似定義的行照一般文字處理。
+- 程式碼區塊（含清單與引用中的）、網址（含 `www.`）、圖片語法、跳脫的括號與 `~/` 路徑不轉換。參考式連結的定義只改目的地；段落中形似定義的行照一般文字處理，引用或清單裡的定義維持原樣。
 - 與原生的差異：不套用 `maxProseWidth`；說話者標籤下方多一列空行；滑鼠選取可能包含項目符號；macOS 以外的項目符號與原生不同。
 
 ## 效能
@@ -32,7 +32,7 @@
 
 ## 驗證
 
-46／46 core tests、31／31 native kit tests、2.1.289 原生 TypeScript 與 strict validation 通過。herdr 0.9.3 內的 live 測試：單擊路徑開啟 pane 並畫出圖片像素、Esc 關閉無 helper 殘留、沒有模型請求。細節見[驗證紀錄](verification.md)。
+48／48 core tests、31／31 native kit tests、2.1.289 原生 TypeScript 與 strict validation 通過。herdr 0.9.3 內的 live 測試：單擊路徑開啟 pane 並畫出圖片像素、Esc 關閉無 helper 殘留、沒有模型請求。細節見[驗證紀錄](verification.md)。
 
 ## 仍未驗證
 
