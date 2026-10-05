@@ -8,15 +8,15 @@
 
 | 層級 | 結果 | 證明與範圍 |
 | --- | --- | --- |
-| Node/helper tests＋core TypeScript | 39 pass、0 fail | 新增 11 項路徑連結規則（含線性時間與參考式連結定義的回歸）與 1 項 helper 接受 root 內絕對路徑 |
-| 官方 native Mod kit | 27 pass、0 fail | 新增 8 項：無媒體路徑照原生、連結與原生列版面、點選經 root 檢查開 pane、被改寫的 href 不開、主畫面（非全螢幕）／非終端／非互動／`clickablePaths:false` 照原生、第二次點選取代 pane 並停止舊 helper |
+| Node/helper tests＋core TypeScript | 46 pass、0 fail | 新增 18 項路徑連結規則（線性時間、清單與引用中的程式碼區塊、參考式定義、`www.` 網址、無法保持可點選的連結、終端超連結判斷）與 1 項 helper 接受 root 內絕對路徑 |
+| 官方 native Mod kit | 31 pass、0 fail | 新增 12 項：無媒體路徑照原生、連結與原生列版面、點選經 root 檢查開 pane、被改寫的 href 不開、主畫面（非全螢幕）／非終端／非互動／`clickablePaths:false`／Terminal.app 照原生、`FORCE_HYPERLINK=1` 開啟連結、閒置輪詢不重畫、無媒體回覆不呼叫引擎、第二次點選取代 pane 並停止舊 helper |
 | 原生 Mod TypeScript | exit0 | 2.1.289 bundled types；暫存 tsconfig 放在 repo 外 |
-| Plugin strict validation | passed | 列出新的 `ui.render{component=AssistantMessage}` |
+| Plugin strict validation | passed | 列出新的 `ui.render{component=AssistantMessage}` 與 10 個 env reads |
 | Live 點選 | 通過 | 以 fork resume 開啟舊 session（沒有呼叫模型，也沒有寫出 session 檔）；單擊回覆中的路徑開啟 pane，視窗截圖有圖片像素；Esc 關閉，無 helper 殘留；輸入框內容不變 |
-| Live 版面 | 一致 | 同一則回覆的 15 列文字與原生繪製逐列相同，含上方空行 |
+| Live 版面 | 一致 | 同一則回覆的 15 列文字與原生繪製逐列相同，含上方空行（不在說話者標籤下、未設定 `maxProseWidth`） |
 | herdr 內的超連結 | 需 `FORCE_HYPERLINK=1` | 未設定時連結畫成「路徑 (file:///…)」，單擊沒有送到 Mod；設定後送達 |
 
-6 次單擊中 5 次送達。唯一未送達的一次，緊接在測試程式切換 herdr 分頁、畫面重新排版之後；之後 3 次重試都送達。這是測試流程中的觀察，未確認原因。
+6 次單擊中 5 次送達。唯一未送達的一次，緊接在測試程式切換 herdr 分頁、畫面重新排版之後；之後 3 次重試都送達。2.1.289 會忽略視窗啟用時、以及可點選 Markdown 掛載後 300ms 內的點擊，與這次的時機相符；未另行重現確認。
 
 ## 分層證據
 

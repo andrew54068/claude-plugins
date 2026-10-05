@@ -6,7 +6,7 @@
 
 要在Claude自己的pane、輸入框上方或Read結果列顯示內容，需要原生UI事件入口。Mods提供這類入口；MCP適合提供工具，skill提供指引，本專案沒有必要再架MCP／網頁server來完成終端預覽。[官方Mods概覽](https://code.claude.com/docs/en/plugins/mods/overview)
 
-實作以`hooks/register.ts`註冊`/preview`與三個render sites：Pane、AbovePrompt、Read ToolResult。native`Markdown`、`Image`、`ui.blit`負責畫面；圖片bytes留在UI管線，不塞入prompt或自建model tool result。[入口](../hooks/register.ts#L264)
+實作以`hooks/register.ts`註冊`/preview`與三個render sites：Pane、AbovePrompt、Read ToolResult。native`Markdown`、`Image`、`ui.blit`負責畫面；圖片bytes留在UI管線，不塞入prompt或自建model tool result。[入口](../hooks/register.ts#L306)
 
 原生Image是terminal-only，Markdown單元件上限10,000字元；helper採9000字元分頁。型別契約則直接使用2.1.288 runtime生成檔，避免拿較舊公開copy推測現行API。[官方reference](https://code.claude.com/docs/en/plugins/mods/reference)
 
@@ -14,15 +14,15 @@
 
 Mod module不使用Node API。它以argv啟動隨plugin附帶的Node stdlib helper，後者檢查root／regular file／inode並呼叫已安裝ffmpeg、ffprobe。runtime的`process.spawn`輸出是UTF-8 `{stream,text}`；PNG原始bytes因此先分割完整frame，再以base64包成NDJSON。共享parser處理跨chunk的record，拒絕截斷、錯誤型別、超大record與控制字元。[helper](../scripts/media.mjs)、[protocol](../hooks/protocol.ts)
 
-影片不是輪播單張縮圖：ffmpeg連續解碼、8 fps、限制640×360，逐幀交給同一keyedImage／blit；blit被拒絕時保存新frame再redraw。Player只管理時間與世代，hoststream的return負責真正取消helper。暫停／跳轉／close讓舊世代失效，避免晚到影格覆寫新pane。[player](../hooks/player.ts)、[consumer](../hooks/register.ts#L89)
+影片不是輪播單張縮圖：ffmpeg連續解碼、8 fps、限制640×360，逐幀交給同一keyedImage／blit；blit被拒絕時保存新frame再redraw。Player只管理時間與世代，hoststream的return負責真正取消helper。暫停／跳轉／close讓舊世代失效，避免晚到影格覆寫新pane。[player](../hooks/player.ts)、[consumer](../hooks/register.ts#L97)
 
-pane預覽來源前600秒，跳轉也限制在0–600；即使helper可從某offset再解碼600秒，Mod在抵達來源上限時離開consumer並於finally清理，畫面明說前10分鐘。v1無音訊、codec能力依已安裝ffmpeg，沒有承諾全格式播放器。[播放](../hooks/register.ts#L190)
+pane預覽來源前600秒，跳轉也限制在0–600；即使helper可從某offset再解碼600秒，Mod在抵達來源上限時離開consumer並於finally清理，畫面明說前10分鐘。v1無音訊、codec能力依已安裝ffmpeg，沒有承諾全格式播放器。[播放](../hooks/register.ts#L200)
 
 ## 送出前貼圖的內部適配
 
 2.1.288實際`prompt.read`沒有attachmentbytes欄位；composer提供`[Image #N]`。所以本產品每500ms讀目前composer／session／cwd，只查同一session圖片ID的有限快取候選PNG／JPG／GIF／WebP。沒有掃home或歷史session，也不改寫composer。這是實測內部布局的adapter，不是穩定的公開attachmentAPI。原始 API 探針含本機識別資訊，未隨發布包上傳。[cache adapter](../scripts/media.mjs#L122)
 
-最多2張composer縮圖；Readinline與composer共用2個automaticdecoder名額，其餘圖片透過明確button進pane。保留最多16個Read decoded entries，另有128個本次sessionattempt紀錄，使historicalrow重繪不反覆啟動ffmpeg。來源身份與epoch在await前後核對，附件刪除、session變更、關閉或reset後，晚到結果不會復活。[排程](../hooks/register.ts#L66)、[Read](../hooks/register.ts#L369)
+最多2張composer縮圖；Readinline與composer共用2個automaticdecoder名額，其餘圖片透過明確button進pane。保留最多16個Read decoded entries，另有128個本次sessionattempt紀錄，使historicalrow重繪不反覆啟動ffmpeg。來源身份與epoch在await前後核對，附件刪除、session變更、關閉或reset後，晚到結果不會復活。[排程](../hooks/register.ts#L74)、[Read](../hooks/register.ts#L399)
 
 ## SSH傳的是bytes；剪貼簿是另一條路
 

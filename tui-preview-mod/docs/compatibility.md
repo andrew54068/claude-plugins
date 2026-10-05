@@ -10,6 +10,7 @@
 | Air → SSH → Pro herdr | 使用者在 Air 的 Ghostty 截圖看到圖片；另有 8 張有效 PNG 的 byte transport 紀錄 | 已實測圖片像素 |
 | Air → mosh → Pro herdr | mosh 只同步文字畫面，丟棄 Kitty 圖片協定 | 看不到像素；pane 與點選仍可用；中繼方案未實作 |
 | herdr 0.8.x | 設定 `kitty_graphics = true` 並重啟後，直接送出的 Kitty 圖片仍空白 | 需升級到 0.9.3 以上 |
+| Terminal.app、未設 `FORCE_HYPERLINK` 的 herdr | Claude Code 把連結畫成「文字 (網址)」，單擊送不到 Mod | 回覆照原生繪製（依終端環境變數判斷）；kit 測試 |
 | settings 自訂 `ANTHROPIC_BASE_URL`／`ANTHROPIC_AUTH_TOKEN` | Mods 開關沿用 `~/.claude.json` 快取的舊值；舊值為關閉時 Mod 整個不載入 | 以 `DISABLE_TELEMETRY=1` 啟動，代價見 README |
 | Air clipboard → 遠端 composer | 只有 Pro 本機原生 Ctrl-V 實測 | 未驗證 client clipboard 傳送 |
 | 原生 Read inline | 官方 kit 測試保留原生結果、由 base64 解碼 | 自動測試；未做 live Read 工具 smoke |
@@ -38,8 +39,8 @@
 | 自動圖片解碼 | Read／composer共用2個名額；pane是獨立前景操作 |
 | Read cache | 16張 decoded entries；至多128個本次 session 自動 attempt，舊 row 改用按鈕 |
 | 貼圖 | 當前 session/root、數字圖片 ID，固定PNG/JPG/GIF/WebP候選；最多200 IDs、2張縮圖 |
-| 回覆路徑連結 | 圖片／影片副檔名；每則回覆最多256個連結、10000字元；超過或沒有媒體路徑時照原生繪製；點選前不讀檔 |
+| 回覆路徑連結 | 圖片／影片副檔名；超過10000字元或沒有媒體路徑時照原生繪製；超過256個不同路徑時，其餘路徑維持純文字；點選前不讀檔 |
 
-貼圖不是公開 attachment-byte API：`prompt.read` 只有 `[Image #N]` 標記，adapter 使用同一 session 的內部快取規則。版本變更、快取建立晚於第一次檢查、不同 cwd/session 或缺少圖片時可能無法顯示；不會擴大掃描範圍。圖片按鈕可明確重試；`/preview pasted` 只採已完成快照。[helper](../scripts/media.mjs#L122)、[composer](../hooks/register.ts#L247)
+貼圖不是公開 attachment-byte API：`prompt.read` 只有 `[Image #N]` 標記，adapter 使用同一 session 的內部快取規則。版本變更、快取建立晚於第一次檢查、不同 cwd/session 或缺少圖片時可能無法顯示；不會擴大掃描範圍。圖片按鈕可明確重試；`/preview pasted` 只採已完成快照。[helper](../scripts/media.mjs#L122)、[composer](../hooks/register.ts#L249)
 
 設定限制與原生 decoder 權限見 [SECURITY](../SECURITY.md)。SSH 加密傳輸不會提升終端的畫圖能力，也不會自動傳送 client clipboard。

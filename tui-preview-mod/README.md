@@ -73,9 +73,9 @@ plugin manifest 在 `tui-preview-mod/.claude-plugin/`；marketplace manifest 在
 全螢幕介面（`CLAUDE_CODE_NO_FLICKER=1` 或 `/tui fullscreen`）下，Claude 回覆裡的圖片或影片路徑會畫成連結，單擊就開啟預覽 pane。相對路徑以 `session.root()` 為準，絕對路徑須在允許的 roots 內。
 
 - **Cmd+click 由終端處理**：Ghostty 會用 macOS 開啟檔案，Mod 收不到這個點擊；請用單擊。Ctrl／Alt+click 也維持 Claude Code 原本的開啟方式。
-- 只重畫提到媒體路徑的回覆，其餘回覆照原生繪製；不改寫已儲存的訊息，也不改變模型輸入。
+- 只重畫提到媒體路徑的回覆，其餘回覆照原生繪製；不改寫已儲存的訊息，也不改變模型輸入。回覆若含重畫後無法點選的連結（`vscode://`、`mailto:`、Email 等），整則照原生繪製。
 - 點選前不讀取任何檔案；點選後走與 `/preview <path>` 相同的目錄、大小與格式檢查。
-- Claude Code 不認得的終端（例如 herdr 內的 `TERM_PROGRAM=herdr`）會把連結畫成「路徑 (file:///…)」且無法點選；加上 `FORCE_HYPERLINK=1` 後才是可點選的路徑文字，見[自訂 API 與 herdr](#自訂-api-與-herdr)。
+- 只在 Claude Code 會畫可點選連結的終端重畫：Ghostty、iTerm2、WezTerm、kitty、Alacritty、Warp、VS Code 1.72+、tmux 3.4+ 等，判斷方式比照 2.1.289。Terminal.app 與 herdr（`TERM_PROGRAM=herdr`）不在其中，回覆照原生繪製；herdr 設定 `FORCE_HYPERLINK=1` 後才會變成可點選的路徑，見[自訂 API 與 herdr](#自訂-api-與-herdr)。
 - 不想重畫回覆時，在 `/plugin` 的設定把 `clickablePaths` 設為 false。
 
 原生貼圖進入目前 composer 後，約每 500ms 更新預覽列；最多兩張縮圖，其餘透過圖片按鈕明確載入。Read inline 與 composer 共用兩個自動解碼名額，前景 pane 是另外一個明確操作。Mod 不改寫輸入、不提交 prompt、不改變 Read 傳給模型的內容。貼圖若尚未完成、讀取失敗或自動預覽關閉，`/preview pasted` 可能沒有可用快照；可透過圖片按鈕重試。[實作](hooks/register.ts)
@@ -107,6 +107,16 @@ claude --settings '{"env":{"DISABLE_TELEMETRY":"1","CLAUDE_CODE_FORCE_TERMINAL_I
 | `FORCE_HYPERLINK=1` | 讓回覆中的路徑成為可點選連結 | 所有連結都改用終端超連結輸出 |
 
 herdr 需 0.9.3 以上；0.8.x 即使設定 `kitty_graphics = true`，直接送出的 Kitty 圖片也是空白。直接在 Ghostty 執行時，只有自訂 API 需要第一項。
+
+不想每次加 `--settings`，可把第一項放進 `~/.claude/settings.json` 的 `env`，後兩項只在 herdr 內 export（herdr 的 pane 有 `HERDR_ENV`）：
+
+```sh
+if [[ -n $HERDR_ENV ]]; then
+  export CLAUDE_CODE_FORCE_TERMINAL_IMAGES=1 FORCE_HYPERLINK=1
+fi
+```
+
+用 cc-switch 這類會重寫 `settings.json` 的工具時，`env` 與 `enabledPlugins` 也要寫進它保存的設定，否則切換供應商後會消失。
 
 ## SSH
 
