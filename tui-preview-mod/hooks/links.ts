@@ -10,18 +10,24 @@ const SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
 const EMAIL = /^[\w.+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/;
 // The targets a plugin-drawn Markdown keeps clickable; a reply with any other keeps core's drawing.
 const KEPT_SCHEME = /^(?:https?|file):/i;
-const KEPT_RELATIVE = /^[A-Za-z0-9._~-]/;
-// A fence may sit under a list item or in a quote; over-detection only leaves text unlinked.
-const FENCE = /^[ \t>]*(`{3,}|~{3,})/;
-const FENCE_CLOSE = /^[ \t>]*[`~]+\s*$/;
+// Core's rule: a relative target's first segment may hold only these characters.
+const KEPT_RELATIVE = /^[A-Za-z0-9._~-]*(?:[/?#]|$)/;
+// A fence may sit under a list item, open on its marker line or sit in a quote; over-detection only leaves text unlinked.
+const CONTAINER = '(?:[ \\t>]|[-*+][ \\t]|\\d{1,9}[.)][ \\t])*';
+const FENCE = new RegExp(`^${CONTAINER}(\`{3,}|~{3,})`);
+const FENCE_CLOSE = new RegExp(`^${CONTAINER}[\`~]+\\s*$`);
 // A definition is its label, its destination and at most a title; anything else on the line is prose.
 const REFERENCE = /^( {0,3}\[[^\]\n]+\]:[ \t]*)<?([^\s<>]+)>?((?:[ \t]+(?:"[^"\n]*"|'[^'\n]*'|\([^()\n]*\)))?[ \t]*)$/;
+// A definition may also follow a heading, a thematic break or a setext underline.
+const BLOCK_END = /^ {0,3}(?:#{1,6}(?:[ \t]|$)|([-*_])(?:[ \t]*\1){2,}[ \t]*$|=+[ \t]*$|-+[ \t]*$)/;
+// A definition inside a quote or list item is left as written rather than followed through its container.
+const CONTAINED_DEFINITION = new RegExp(`^[ \\t]*(?:>|[-*+][ \\t]|\\d{1,9}[.)][ \\t])${CONTAINER}\\[[^\\]\\n]+\\]:`);
 // Markdown link with an optional title, code span, <autolink or HTML>, URL, then one maximal run
 // of path characters. A label or <…> stops at its own opener, a code span starts only at the
 // head of a backtick run and a scheme is at most 32 characters, so no position is rescanned.
 // Bare paths are ASCII so prose glued to them (存到content/a.png了) stays outside the link.
 const TOKEN = new RegExp([
-  '(?<bang>!?)\\[(?<label>[^\\[\\]\\n]*)\\]\\((?<target>[^()\\s]+)(?<title>[ \\t]+(?:"[^"\\n]*"|\'[^\'\\n]*\'|\\([^()\\n]*\\)))?[ \\t]*\\)',
+  '(?<bang>!?)\\[(?<label>[^\\[\\]\\n]*)\\]\\([ \\t]*(?<target>[^()\\s]+)(?<title>[ \\t]+(?:"[^"\\n]*"|\'[^\'\\n]*\'|\\([^()\\n]*\\)))?[ \\t]*\\)',
   '(?<!`)(?=(?<ticks>`+))\\k<ticks>(?<code>[^`\\n]+?)\\k<ticks>',
   '<(?<angle>[^<>\\n]*)>',
   '(?:[A-Za-z][A-Za-z0-9+.-]{0,31}:\\/\\/|www\\.)[^\\s<>()]*',
@@ -102,14 +108,14 @@ export function linkifyMediaPaths(markdown: string, root: string, extraRoots: re
     if (bare === undefined) return whole;
     if (EMAIL.test(bare)) { keepsCore = true; return whole; }
     // The target of a link the link pattern could not take (nested brackets, an escape) stays as written.
-    if (line.slice(Math.max(0, offset - 2), offset) === '](') return whole;
+    if (/\]\([ \t]*$/.test(line.slice(Math.max(0, offset - 64), offset))) return whole;
     // A sentence's closing dots trail the path; a bare token must hold a directory.
     const path = bare.replace(/\.+$/, '');
     const href = path.includes('/') ? hrefOf(mediaPath(path)) : undefined;
     return href ? `[${path}](${href})${bare.slice(path.length)}` : whole;
   });
   let fence: { char: string; size: number } | undefined;
-  // A definition starts the text, follows a blank line, a fence or another definition; it cannot interrupt a paragraph.
+  // A definition starts the text or follows a blank line, a fence, a heading, a rule or another definition; it cannot interrupt a paragraph.
   let definitionMayStart = true;
   const lines = markdown.split('\n').map(line => {
     const marker = FENCE.exec(line)?.[1];
@@ -126,7 +132,8 @@ export function linkifyMediaPaths(markdown: string, root: string, extraRoots: re
       if (!href) keep(target);
       return href ? `${definition[1]}${href}${definition[3]}` : line;
     }
-    definitionMayStart = !line.trim();
+    if (CONTAINED_DEFINITION.test(line)) { definitionMayStart = false; return line; }
+    definitionMayStart = !line.trim() || BLOCK_END.test(line);
     return linkLine(line);
   });
   const text = lines.join('\n');

@@ -70,7 +70,7 @@ test('one href per path, at most MAX_LINKS, and text over 10000 characters falls
 });
 
 test('long unbroken tokens are scanned in linear time', () => {
-  for (const text of ['a.'.repeat(4_900), 'a'.repeat(9_900), `${'ab/'.repeat(3_200)}x.png`, `${'['.repeat(9_980)} a/b.png`, `${'<'.repeat(9_980)} a/b.png`, `${'a+'.repeat(4_980)} a/b.png`, `${'`'.repeat(9_980)} a/b.png`]) {
+  for (const text of ['a.'.repeat(4_900), 'a'.repeat(9_900), `${'ab/'.repeat(3_200)}x.png`, `${'['.repeat(9_980)} a/b.png`, `${'<'.repeat(9_980)} a/b.png`, `${'a+'.repeat(4_980)} a/b.png`, `${'`'.repeat(9_980)} a/b.png`, `${'- '.repeat(4_980)}a/b.png`, `${' '.repeat(9_980)}a/b.png`, `${'> '.repeat(4_980)}[x]: a/b.png`, `${'1. '.repeat(3_300)}a/b.png`]) {
     const start = performance.now();
     linked(text);
     assert.ok(performance.now() - start < 100, `${text.slice(0, 6)}… took ${(performance.now() - start).toFixed(0)}ms`);
@@ -105,10 +105,26 @@ test('www. web links, titled links, escaped and nested brackets are not corrupte
 });
 
 test('a reply with a link the redraw could not keep clickable falls back to the native drawing', () => {
-  for (const other of ['[open](vscode://file/work/a.ts)', '[說明](文件/說明.md)', '<obsidian://open?vault=x>', '\n\n[1]: mailto:a@b.dev', 'or write to a.b@x.dev']) {
+  for (const other of ['[open](vscode://file/work/a.ts)', '[說明](文件/說明.md)', '[筆記](2026筆記.md)', '[f](my%20file.md)', '<obsidian://open?vault=x>', '\n\n[1]: mailto:a@b.dev', 'or write to a.b@x.dev', 'and icon@2x.png']) {
     assert.equal(linked(`See content/a.png and ${other}`), undefined, other);
   }
-  assert.ok(linked('See content/a.png and [docs](docs/readme.md), [web](https://x.dev), [here](./a.md)'));
+  assert.ok(linked('See content/a.png and [docs](docs/readme.md), [web](https://x.dev), [here](./a.md), [log](/tmp/build.log), [below](#usage)'));
+});
+
+test('definitions after a heading or a rule keep their shape; ones inside a quote or list stay as written', () => {
+  assert.equal(linked('## Files\n[cover]: content/a.png')?.text, '## Files\n[cover]: file:///work/content/a.png');
+  assert.equal(linked('Intro\n\n---\n[cover]: content/a.png')?.text, 'Intro\n\n---\n[cover]: file:///work/content/a.png');
+  assert.equal(linked('Title\n===\n[cover]: content/a.png')?.text, 'Title\n===\n[cover]: file:///work/content/a.png');
+  assert.equal(linked('> [cover]: content/a.png\n\nsee a/b.png')?.text, '> [cover]: content/a.png\n\nsee [a/b.png](file:///work/a/b.png)');
+  assert.equal(linked('- [cover]: content/a.png'), undefined);
+});
+
+test('a link target after spaces and a fence on a list-marker line are not corrupted', () => {
+  assert.equal(linked('[x]( content/a.png )')?.text, '[x](file:///work/content/a.png)');
+  assert.equal(linked('[x]( content/a.png "t")')?.text, '[x](file:///work/content/a.png "t")');
+  assert.equal(linked('[a [b] c]( content/a.png)'), undefined);
+  assert.equal(linked('- ```sh\n  open content/a.png\n  ```\n- see a/y.png')?.text, '- ```sh\n  open content/a.png\n  ```\n- see [a/y.png](file:///work/a/y.png)');
+  assert.equal(linked('1. ```sh\n   open content/a.png\n   ```'), undefined);
 });
 
 test('retina-style filenames with @ link as one path', () => {
