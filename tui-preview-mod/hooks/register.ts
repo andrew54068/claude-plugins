@@ -2,7 +2,7 @@ import type { CoreEngineInterface, HookStream, ProcessSpawnChunk, ProcessSpawnRe
 import { NdjsonParser } from './protocol.ts';
 import type { HeaderRecord, FrameRecord, MarkdownRecord } from './protocol.ts';
 import { Player } from './player.ts';
-import { linkifyMediaPaths, mentionsMedia, pathFromHref } from './links.ts';
+import { hyperlinkTerminal, linkifyMediaPaths, mentionsMedia, pathFromHref } from './links.ts';
 
 type Api = CoreEngineInterface;
 type Job = { stream: HookStream<ProcessSpawnChunk, ProcessSpawnResult>; stopped: boolean; stopping?: Promise<void> };
@@ -20,6 +20,7 @@ const time = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.flo
   let options: PluginOptions = {};
   let automatic = true;
   let clickable = true;
+  let hyperlinks = false;
   let interactive = false;
   let polling: Timer | undefined;
   let pollBusy = false;
@@ -280,6 +281,14 @@ const time = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.flo
     } catch { /* No clipboard/history fallback; retry the current snapshot next tick. */ }
     finally { pollBusy = false; }
   }
+  // Each name is a literal so `claude plugin validate` lists what is read.
+  async function terminalEnv($: Api) {
+    const [FORCE_HYPERLINK, CI, WT_SESSION, TERM_PROGRAM, TERM_PROGRAM_VERSION, VTE_VERSION, TERM, TERMINAL_EMULATOR, TMUX, LC_TERMINAL] = await Promise.all([
+      $.env.get('FORCE_HYPERLINK'), $.env.get('CI'), $.env.get('WT_SESSION'), $.env.get('TERM_PROGRAM'), $.env.get('TERM_PROGRAM_VERSION'),
+      $.env.get('VTE_VERSION'), $.env.get('TERM'), $.env.get('TERMINAL_EMULATOR'), $.env.get('TMUX'), $.env.get('LC_TERMINAL'),
+    ]);
+    return { FORCE_HYPERLINK, CI, WT_SESSION, TERM_PROGRAM, TERM_PROGRAM_VERSION, VTE_VERSION, TERM, TERMINAL_EMULATOR, TMUX, LC_TERMINAL };
+  }
   function ensurePolling($: Api) {
     if (interactive && automatic && !polling && !resetting) {
       polling = $.clock.every(500, () => { void poll($); });
@@ -301,6 +310,9 @@ export const register: Register = (on, configuration) => {
   on('session.start', async ($, e, next) => {
     await reset();
     interactive = e.isInteractive && e.surface === 'terminal';
+    // Where Claude Code draws a link as `text (url)` no press reaches it, so replies keep core's drawing there.
+    hyperlinks = interactive && hyperlinkTerminal(await terminalEnv($));
+    if (hyperlinks) redraw($);
     await $.command.register({ name: 'preview', description: '預覽 Markdown、圖片、影片與貼圖', argumentHint: '<路徑>|pasted|close|on|off', immediate: true });
     ensurePolling($);
     return next(e);
@@ -412,10 +424,10 @@ export const register: Register = (on, configuration) => {
   });
   // A reply naming media paths is redrawn with those paths as links this Mod answers on a plain
   // click; the stored message and the model's input stay as they were, and nothing is read until then.
-  // Only the fullscreen layout reports clicks, so the main screen keeps core's drawing untouched; a reply
-  // naming no media file gets core's drawing before any engine call.
+  // Only the fullscreen layout of a terminal with clickable links reports a press; elsewhere, and for
+  // a reply naming no media file, core's drawing is returned before any engine call.
   on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
-    if (e.surface !== 'terminal' || e.viewport?.isFullscreen !== true || !interactive || !clickable || resetting || !mentionsMedia(e.props.text)) return next(e);
+    if (e.surface !== 'terminal' || e.viewport?.isFullscreen !== true || !interactive || !clickable || !hyperlinks || resetting || !mentionsMedia(e.props.text)) return next(e);
     const renderingEpoch = epoch;
     const root = await $.session.root();
     const reply = renderingEpoch === epoch ? linkifyMediaPaths(e.props.text, root, extraRoots()) : undefined;

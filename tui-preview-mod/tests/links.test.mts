@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { MAX_LINKS, fileHref, linkifyMediaPaths, mentionsMedia, pathFromHref } from '../hooks/links.js';
+import { MAX_LINKS, fileHref, hyperlinkTerminal, linkifyMediaPaths, mentionsMedia, pathFromHref } from '../hooks/links.js';
 
 const ROOT = '/work';
 const linked = (text: string, roots: string[] = []) => linkifyMediaPaths(text, ROOT, roots);
@@ -119,4 +119,18 @@ test('only text naming a media extension is worth linkifying', () => {
   assert.ok(mentionsMedia('see content/a.PNG.'));
   assert.ok(mentionsMedia('clip/w.mp4了'));
   assert.equal(mentionsMedia('a.pngx, notes.md, image.png_old'), false);
+});
+
+test('hyperlink support mirrors Claude Code 2.1.289', () => {
+  const yes = [
+    { TERM_PROGRAM: 'ghostty' }, { TERM_PROGRAM: 'iTerm.app', TERM_PROGRAM_VERSION: '3.0.0' }, { TERM_PROGRAM: 'WezTerm', TERM_PROGRAM_VERSION: '20240203-110809-5046fc22', TERM: 'xterm-256color' },
+    { TERM_PROGRAM: 'vscode', TERM_PROGRAM_VERSION: '1.72.0', TERM: 'xterm-256color' }, { TERM_PROGRAM: 'tmux', TERM_PROGRAM_VERSION: '3.4' }, { LC_TERMINAL: 'iTerm2' }, { TERM: 'xterm-kitty' },
+    { TERM: 'alacritty' }, { WT_SESSION: 'x' }, { VTE_VERSION: '7600', TERM: 'xterm-256color' }, { TERMINAL_EMULATOR: 'JetBrains-JediTerm' }, { TERM_PROGRAM: 'herdr', FORCE_HYPERLINK: '1' },
+  ];
+  const no = [
+    {}, { TERM_PROGRAM: 'Apple_Terminal' }, { TERM_PROGRAM: 'herdr' }, { TERM_PROGRAM: 'tmux', TERM_PROGRAM_VERSION: '3.3a' }, { TERM_PROGRAM: 'vscode', TERM_PROGRAM_VERSION: '1.71.2', TERM: 'xterm-256color' },
+    { TERM: 'xterm-ghostty' }, { VTE_VERSION: '0.50.0', TERM: 'xterm-256color' }, { TERM_PROGRAM: 'WezTerm', TERM_PROGRAM_VERSION: '20240203' }, { TERM_PROGRAM: 'ghostty', FORCE_HYPERLINK: '0' }, { TERM_PROGRAM: 'WezTerm', TERM_PROGRAM_VERSION: '20240203', TERM: 'xterm-256color', CI: 'true' },
+  ];
+  for (const env of yes) assert.equal(hyperlinkTerminal(env), true, JSON.stringify(env));
+  for (const env of no) assert.equal(hyperlinkTerminal(env), false, JSON.stringify(env));
 });

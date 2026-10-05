@@ -12,8 +12,9 @@ const header = (kind: string, name: string, duration = 5) => ({ type: 'header', 
 const frame = (time = 0) => ({ type: 'frame', png: PNG, time, width: 16, height: 8 });
 const readRow = (id: string) => ({ plugin: PLUGIN, surface: 'terminal', component: 'ToolResult', requestId: id, viewport: { columns: 80, rows: 30, isFullscreen: false }, props: { tool_use_id: id, tool: 'Read', isErrored: false, output: { type: 'image', file: { base64: PNG, type: 'image/png', originalSize: 70 } } } } as const);
 
-function host(on: On) {
+function host(on: On, env: Record<string, string> = { TERM_PROGRAM: 'ghostty', TERM: 'xterm-ghostty' }) {
   const clock = mock.clock(on);
+  mock.env(on, env);
   const state = { draft: '', root: '/work', id: '60b13e72-306e-406f-86c5-f5541ef749f5', reads: 0, roots: 0, requests: [] as ProcessSpawnRequest[], calls: [] as string[][], commands: [] as unknown[], blits: [] as unknown[], invalidations: 0, stopped: 0, videoDuration: 5, badExit: false, badRecord: false, blitDenied: false, imageDelay: 0, inspectDelay: 0, activeImages: 0, peakImages: 0, activeVideo: 0, initialVideoTime: 0, videoFrameTime: undefined as number | undefined, returnDelay: 0, opened: 0, renderDelay: 0 };
   on('session.start', () => ({ cwd: '/work' }));
   on('session.end', () => ({ sessionId: state.id }));
@@ -494,6 +495,23 @@ test('clickablePaths off keeps every reply core-drawn', { options: { clickablePa
   const ui = await $.ui.mount(reply('Saved `content/a.png`.'));
   expect(await ui.find({ type: 'Text', text: '原生輸出' })).toBeDefined();
   expect(await ui.find({ type: 'Markdown' })).toBeUndefined();
+  await ui.unmount();
+});
+
+test('replies stay core-drawn where the terminal draws links as text (url)', async ($, on) => {
+  host(on, { TERM_PROGRAM: 'Apple_Terminal', TERM: 'xterm-256color' });
+  await $.session.start(START);
+  const ui = await $.ui.mount(reply('Saved `content/a.png`.'));
+  expect(await ui.find({ type: 'Text', text: '原生輸出' })).toBeDefined();
+  expect(await ui.find({ type: 'Markdown' })).toBeUndefined();
+  await ui.unmount();
+});
+
+test('FORCE_HYPERLINK=1 turns reply links on in a terminal Claude Code does not list', async ($, on) => {
+  host(on, { TERM_PROGRAM: 'herdr', TERM: 'xterm-256color', FORCE_HYPERLINK: '1' });
+  await $.session.start(START);
+  const ui = await $.ui.mount(reply('Saved `content/a.png`.'));
+  expect((await ui.find({ type: 'Markdown', key: 'reply-paths' }))?.props.pressableLinks).toEqual([HREF]);
   await ui.unmount();
 });
 

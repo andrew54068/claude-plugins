@@ -137,3 +137,48 @@ export function linkifyMediaPaths(markdown: string, root: string, extraRoots: re
 export function mentionsMedia(text: string) {
   return MENTION.test(text);
 }
+
+export type TerminalEnv = Readonly<Record<string, string | undefined>>;
+
+// Claude Code 2.1.289 draws a link as a clickable cell only where its hyperlink check holds
+// (G_ over supports-hyperlinks); elsewhere a link draws as `text (url)` and no press arrives.
+const LINK_TERMINALS = ['ghostty', 'Hyper', 'kitty', 'alacritty', 'iTerm.app', 'iTerm2', 'WarpTerminal'];
+function version(value = '') {
+  if (/^\d{3,4}$/.test(value)) return { major: 0, minor: parseInt(/(\d{1,2})(\d{2})/.exec(value)?.[1] ?? '', 10) };
+  const [major = NaN, minor = NaN] = value.split('.').map(part => parseInt(part, 10));
+  return { major, minor };
+}
+// supports-hyperlinks for a colour TTY; NETLIFY, TEAMCITY_VERSION and CLI flags are left out, so it only errs towards false.
+function streamLinks(env: TerminalEnv) {
+  if (!env.TERM || env.TERM === 'dumb') return false;
+  if (env.WT_SESSION !== undefined) return true;
+  if (env.CI) return false;
+  const program = version(env.TERM_PROGRAM_VERSION);
+  switch (env.TERM_PROGRAM) {
+    case 'iTerm.app': return program.major === 3 ? program.minor >= 1 : program.major > 3;
+    case 'WezTerm': return program.major >= 20200620;
+    case 'vscode': return program.major > 1 || (program.major === 1 && program.minor >= 72);
+    case 'ghostty': return true;
+  }
+  if (env.VTE_VERSION) {
+    if (env.VTE_VERSION === '0.50.0') return false;
+    const vte = version(env.VTE_VERSION);
+    return vte.major > 0 || vte.minor >= 50;
+  }
+  return env.TERM === 'alacritty';
+}
+export function hyperlinkTerminal(env: TerminalEnv) {
+  const force = env.FORCE_HYPERLINK;
+  if (force !== undefined) return force ? parseInt(force, 10) !== 0 : streamLinks(env);
+  if (streamLinks(env)) return true;
+  const program = env.TERM_PROGRAM;
+  if (program && LINK_TERMINALS.includes(program)) return true;
+  if (env.TERMINAL_EMULATOR === 'JetBrains-JediTerm') return true;
+  if (env.WT_SESSION && program !== 'tmux' && !env.TMUX) return true;
+  if (program === 'tmux') {
+    const tmux = version(env.TERM_PROGRAM_VERSION);
+    if (tmux.major > 3 || (tmux.major === 3 && tmux.minor >= 4)) return true;
+  }
+  if (env.LC_TERMINAL && LINK_TERMINALS.includes(env.LC_TERMINAL)) return true;
+  return !!env.TERM?.includes('kitty');
+}
