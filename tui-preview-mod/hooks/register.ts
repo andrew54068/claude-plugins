@@ -409,8 +409,9 @@ export const register: Register = (on, configuration) => {
   });
   // A reply naming media paths is redrawn with those paths as links this Mod answers on a plain
   // click; the stored message and the model's input stay as they were, and nothing is read until then.
+  // Only the fullscreen layout reports clicks, so the main screen keeps core's drawing untouched.
   on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
-    if (e.surface !== 'terminal' || !interactive || !clickable || resetting) return next(e);
+    if (e.surface !== 'terminal' || e.viewport?.isFullscreen !== true || !interactive || !clickable || resetting) return next(e);
     const renderingEpoch = epoch;
     const root = await $.session.root();
     const reply = renderingEpoch === epoch ? linkifyMediaPaths(e.props.text, root, extraRoots()) : undefined;

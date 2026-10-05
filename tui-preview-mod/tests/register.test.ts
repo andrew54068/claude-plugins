@@ -466,6 +466,16 @@ test('a press whose href was rewritten to a path it never drew spawns nothing', 
   await ui.unmount();
 });
 
+test('replies stay core-drawn on the main screen, where no click reaches a link', async ($, on) => {
+  host(on);
+  await $.session.start(START);
+  const main = { ...reply('Saved `content/a.png`.'), viewport: { columns: 80, rows: 30, isFullscreen: false } };
+  const ui = await $.ui.mount(main);
+  expect(await ui.find({ type: 'Text', text: '原生輸出' })).toBeDefined();
+  expect(await ui.find({ type: 'Markdown' })).toBeUndefined();
+  await ui.unmount();
+});
+
 test('replies stay core-drawn off the terminal and in non-interactive sessions', async ($, on) => {
   host(on);
   await $.session.start({ ...START, isInteractive: false });
