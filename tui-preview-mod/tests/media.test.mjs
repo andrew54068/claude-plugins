@@ -81,6 +81,14 @@ test('URL, outside root, symlink, directory and FIFO are rejected without a bloc
     assert.equal(result.records.at(-1)?.type, 'error', path);
   }
 });
+test('an absolute path inside the root is accepted like its relative form', async () => {
+  for (const command of ['inspect', 'image']) {
+    const result = await run(command, join(root, 'red.png'));
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(result.records[0].kind, 'image');
+    assert.equal(result.records.at(-1).type, 'end');
+  }
+});
 test('bounded input and malformed media fail with typed error and nonzero exit', async () => {
   await writeFile(join(root, 'large.md'), '');
   await truncate(join(root, 'large.md'), 2 * 1024 * 1024 + 1);

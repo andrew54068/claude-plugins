@@ -12,12 +12,13 @@ const header = (kind: string, name: string, duration = 5) => ({ type: 'header', 
 const frame = (time = 0) => ({ type: 'frame', png: PNG, time, width: 16, height: 8 });
 const readRow = (id: string) => ({ plugin: PLUGIN, surface: 'terminal', component: 'ToolResult', requestId: id, viewport: { columns: 80, rows: 30, isFullscreen: false }, props: { tool_use_id: id, tool: 'Read', isErrored: false, output: { type: 'image', file: { base64: PNG, type: 'image/png', originalSize: 70 } } } } as const);
 
-function host(on: On) {
+function host(on: On, env: Record<string, string> = { TERM_PROGRAM: 'ghostty', TERM: 'xterm-ghostty' }) {
   const clock = mock.clock(on);
-  const state = { draft: '', root: '/work', id: '60b13e72-306e-406f-86c5-f5541ef749f5', reads: 0, requests: [] as ProcessSpawnRequest[], calls: [] as string[][], commands: [] as unknown[], blits: [] as unknown[], invalidations: 0, stopped: 0, videoDuration: 5, badExit: false, badRecord: false, blitDenied: false, imageDelay: 0, inspectDelay: 0, activeImages: 0, peakImages: 0, activeVideo: 0, initialVideoTime: 0, videoFrameTime: undefined as number | undefined, returnDelay: 0, opened: 0, renderDelay: 0 };
+  mock.env(on, env);
+  const state = { draft: '', root: '/work', id: '60b13e72-306e-406f-86c5-f5541ef749f5', reads: 0, roots: 0, requests: [] as ProcessSpawnRequest[], calls: [] as string[][], commands: [] as unknown[], blits: [] as unknown[], invalidations: 0, stopped: 0, videoDuration: 5, badExit: false, badRecord: false, blitDenied: false, imageDelay: 0, inspectDelay: 0, activeImages: 0, peakImages: 0, activeVideo: 0, initialVideoTime: 0, videoFrameTime: undefined as number | undefined, returnDelay: 0, opened: 0, renderDelay: 0 };
   on('session.start', () => ({ cwd: '/work' }));
   on('session.end', () => ({ sessionId: state.id }));
-  on('session.root', () => ({ value: state.root }));
+  on('session.root', () => { state.roots++; return { value: state.root }; });
   on('session.id', () => ({ value: state.id }));
   on('prompt.read', () => { state.reads++; return { value: { text: state.draft, cursor: state.draft.length } }; });
   on('command.register', ($, e) => { state.commands.push(e); return { value: { command: e.name } }; });
@@ -409,4 +410,147 @@ test('successful video blits redraw the clock once per displayed second with aut
     await clock.advance(300); await ending; await ui.unmount();
   }
   expect(state.activeVideo).toBe(0);
+});
+
+const reply = (text: string, isFirstOfReply = true, surface: 'terminal' | 'desktop' = 'terminal') => ({ plugin: PLUGIN, surface, component: 'AssistantMessage', requestId: 'reply1', viewport: { columns: 80, rows: 30, isFullscreen: true }, props: { text, isFirstOfReply } } as const);
+const HREF = 'file:///work/content/a.png';
+const helperCalls = (state: { requests: ProcessSpawnRequest[] }) => state.requests.map(request => request.argv.slice(2));
+
+test('a reply without a media path keeps the engine drawing', async ($, on) => {
+  host(on);
+  await $.session.start(START);
+  for (const text of ['All done, see README.md and src/main.ts', 'see /etc/a.png', `${'x'.repeat(10_001)} a/b.png`]) {
+    const ui = await $.ui.mount(reply(text));
+    expect(await ui.find({ type: 'Text', text: '原生輸出' })).toBeDefined();
+    expect(await ui.find({ type: 'Markdown' })).toBeUndefined();
+    await ui.unmount();
+  }
+});
+
+test('a reply naming an image path draws the path as a link the Mod answers, in the core row layout', async ($, on) => {
+  host(on);
+  await $.session.start(START);
+  const ui = await $.ui.mount(reply('Saved `content/a.png`.'));
+  const markdown = await ui.find({ type: 'Markdown', key: 'reply-paths' });
+  expect(markdown?.props.text).toBe(`Saved [\`content/a.png\`](${HREF}).`);
+  expect(markdown?.props.pressableLinks).toEqual([HREF]);
+  expect(await ui.find({ type: 'Text', text: '⏺' })).toBeDefined();
+  expect((await ui.find({ type: 'Box' }))?.props).toEqual(expect.objectContaining({ flexDirection: 'row', marginTop: 1 }));
+  await ui.unmount();
+  const continued = await $.ui.mount(reply('Saved `content/a.png`.', false));
+  expect(await continued.find({ type: 'Text', text: '⏺' })).toBeUndefined();
+  await continued.unmount();
+});
+
+test('pressing the path opens the preview pane through the root-checked helper', async ($, on) => {
+  const { clock, state } = host(on);
+  await $.session.start(START);
+  const ui = await $.ui.mount(reply('Saved `content/a.png`.'));
+  await ui.press({ key: 'reply-paths', link: { href: HREF } });
+  await clock.settle();
+  expect(state.opened).toBe(1);
+  expect(helperCalls(state)).toEqual([['inspect', '--root', '/work', '--path', '/work/content/a.png'], ['image', '--root', '/work', '--path', '/work/content/a.png']]);
+  const pane = await $.ui.mount(PANE);
+  expect(await pane.find({ type: 'Image' })).toBeDefined();
+  await pane.unmount(); await ui.unmount();
+});
+
+test('a press whose href was rewritten to a path it never drew spawns nothing', async ($, on) => {
+  const { clock, state } = host(on);
+  on('ui.press', ($, e, next) => next({ ...e, link: { href: 'file:///etc/a.png' } }));
+  await $.session.start(START);
+  const ui = await $.ui.mount(reply('Saved `content/a.png`.'));
+  await ui.press({ key: 'reply-paths', link: { href: HREF } });
+  await clock.settle();
+  expect(state.requests.length).toBe(0);
+  expect(state.opened).toBe(0);
+  await ui.unmount();
+});
+
+test('replies stay core-drawn on the main screen, where no click reaches a link', async ($, on) => {
+  host(on);
+  await $.session.start(START);
+  const main = { ...reply('Saved `content/a.png`.'), viewport: { columns: 80, rows: 30, isFullscreen: false } };
+  const ui = await $.ui.mount(main);
+  expect(await ui.find({ type: 'Text', text: '原生輸出' })).toBeDefined();
+  expect(await ui.find({ type: 'Markdown' })).toBeUndefined();
+  await ui.unmount();
+});
+
+test('replies stay core-drawn off the terminal and in non-interactive sessions', async ($, on) => {
+  host(on);
+  await $.session.start({ ...START, isInteractive: false });
+  const quiet = await $.ui.mount(reply('Saved `content/a.png`.'));
+  expect(await quiet.find({ type: 'Markdown' })).toBeUndefined();
+  await quiet.unmount();
+  await $.session.start(START);
+  const desktop = await $.ui.mount(reply('Saved `content/a.png`.', true, 'desktop'));
+  expect(await desktop.find({ type: 'Markdown' })).toBeUndefined();
+  await desktop.unmount();
+});
+
+test('clickablePaths off keeps every reply core-drawn', { options: { clickablePaths: false } }, async ($, on) => {
+  host(on);
+  await $.session.start(START);
+  const ui = await $.ui.mount(reply('Saved `content/a.png`.'));
+  expect(await ui.find({ type: 'Text', text: '原生輸出' })).toBeDefined();
+  expect(await ui.find({ type: 'Markdown' })).toBeUndefined();
+  await ui.unmount();
+});
+
+test('replies stay core-drawn where the terminal draws links as text (url)', async ($, on) => {
+  host(on, { TERM_PROGRAM: 'Apple_Terminal', TERM: 'xterm-256color' });
+  await $.session.start(START);
+  const ui = await $.ui.mount(reply('Saved `content/a.png`.'));
+  expect(await ui.find({ type: 'Text', text: '原生輸出' })).toBeDefined();
+  expect(await ui.find({ type: 'Markdown' })).toBeUndefined();
+  await ui.unmount();
+});
+
+test('FORCE_HYPERLINK=1 turns reply links on in a terminal Claude Code does not list', async ($, on) => {
+  host(on, { TERM_PROGRAM: 'herdr', TERM: 'xterm-256color', FORCE_HYPERLINK: '1' });
+  await $.session.start(START);
+  const ui = await $.ui.mount(reply('Saved `content/a.png`.'));
+  expect((await ui.find({ type: 'Markdown', key: 'reply-paths' }))?.props.pressableLinks).toEqual([HREF]);
+  await ui.unmount();
+});
+
+test('an idle composer poll redraws nothing, so reply rows are not re-run every half second', async ($, on) => {
+  const { clock, state } = host(on);
+  await $.session.start(START);
+  await clock.advance(600);
+  const before = state.invalidations;
+  await clock.advance(5_000);
+  expect(state.reads).toBeGreaterThan(5);
+  expect(state.invalidations).toBe(before);
+});
+
+test('a reply naming no media file is answered before any engine call', { options: { autoPreview: false } }, async ($, on) => {
+  const { state } = host(on);
+  await $.session.start(START);
+  const ui = await $.ui.mount(reply('All done; notes in docs/readme.md, cover.pngx and a/b.png_old'));
+  expect(await ui.find({ type: 'Text', text: '原生輸出' })).toBeDefined();
+  expect(state.roots).toBe(0);
+  await ui.unmount();
+});
+
+test('a second path press replaces the pane and stops the first helper', { timeoutMs: 10_000 }, async ($, on) => {
+  const { clock, state } = host(on);
+  await $.session.start(START);
+  const ui = await $.ui.mount(reply('Clip `clip/a.mp4` and still `img/b.png`.'));
+  try {
+    await ui.press({ key: 'reply-paths', link: { href: 'file:///work/clip/a.mp4' } });
+    await clock.advance(300);
+    expect(state.activeVideo).toBe(1);
+    const replacing = ui.press({ key: 'reply-paths', link: { href: 'file:///work/img/b.png' } });
+    await clock.advance(300); await replacing; await clock.settle();
+    expect(state.activeVideo).toBe(0);
+    expect(helperCalls(state).at(-1)).toEqual(['image', '--root', '/work', '--path', '/work/img/b.png']);
+    const pane = await $.ui.mount(PANE);
+    expect(await pane.find({ type: 'Image' })).toBeDefined();
+    await pane.unmount();
+  } finally {
+    const ending = $.session.end({ reason: 'prompt_input_exit', sessionId: state.id, resume: { id: state.id } });
+    await clock.advance(300); await ending; await ui.unmount();
+  }
 });

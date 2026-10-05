@@ -2,7 +2,7 @@
 
 在 Claude Code 終端內預覽 Markdown、圖片、影片，以及尚未送出的貼圖。Plugin 名稱是 **`tui-preview-mod`**；`claude-code-preview-mod` 是專案名稱。
 
-本專案以 **Claude Code 2.1.288** 開發與測試。已實測 Markdown 排版、圖片替代文字、連續影片影格、播放控制、送出前貼圖預覽列，以及 SSH 傳回 PNG bytes。**尚未驗證 Ghostty／Kitty 的可見圖片像素、Air 剪貼簿傳到遠端，或其他 Claude Code 版本。** 詳見 [相容性](docs/compatibility.md) 與 [驗證紀錄](docs/verification.md)。
+本專案以 **Claude Code 2.1.289** 測試（0.1.2 以前為 2.1.288）。已實測 Markdown 排版、Ghostty 圖片像素（本機、herdr 0.9.3 內、從 Air 經 SSH）、連續影片影格、播放控制、送出前貼圖預覽列，以及點選回覆中的圖片路徑開啟預覽。**mosh 只同步文字畫面，看不到圖片像素；Air 剪貼簿傳到遠端與其他 Claude Code 版本尚未驗證。** 詳見 [相容性](docs/compatibility.md) 與 [驗證紀錄](docs/verification.md)。
 
 ## 執行需求與試用
 
@@ -31,7 +31,7 @@
 /plugin uninstall tui-preview-mod@preview-mods
 ```
 
-再安裝 `tui-preview-mod@andrew54068`，並從 Configure 重新套用先前記下的設定；尤其是曾設為 false 的 `autoPreview`，否則會恢復預設 true。`andrew54068` 是 marketplace 名稱；`tui-preview-mod` 是 plugin 名稱；本版為 `0.1.2`。舊 `preview-mods` 來源可保留；切換來源不是用來繞過 Mod 開關。
+再安裝 `tui-preview-mod@andrew54068`，並從 Configure 重新套用先前記下的設定；尤其是曾設為 false 的 `autoPreview`，否則會恢復預設 true。`andrew54068` 是 marketplace 名稱；`tui-preview-mod` 是 plugin 名稱；本版為 `0.1.3`。舊 `preview-mods` 來源可保留；切換來源不是用來繞過 Mod 開關。
 
 GitHub 安裝只改變取得外掛的方式，**不能保證 `/preview` 一定可用**。若仍缺少指令，執行 `/plugin` 檢查 `mods active`，並在 shell 執行 `claude plugin test` 查看載入限制；組織政策或 Anthropic 的 Mod 開關仍可拒絕它。[官方診斷](https://code.claude.com/docs/en/plugins/mods/troubleshoot)
 
@@ -58,6 +58,7 @@ plugin manifest 在 `tui-preview-mod/.claude-plugin/`；marketplace manifest 在
 | `/preview notes.md` | 以原生 Markdown 分頁 |
 | `/preview images/photo with spaces.jpg` | 顯示圖片；路徑中的空白保留 |
 | `/preview "videos/demo clip.mp4"` | 以真實連續影格播放影片，無聲音 |
+| 單擊回覆中的 `content/a.png` | 開啟同一個預覽 pane；需全螢幕介面，見下方說明 |
 | `/preview pasted` | 開啟目前 session 最近已完成的貼圖預覽 |
 | `/preview close` | 關閉 pane 並停止其解碼程序 |
 | `/preview on`、`/preview off` | 切換本次載入的自動貼圖／Read 圖片預覽 |
@@ -66,6 +67,16 @@ plugin manifest 在 `tui-preview-mod/.claude-plugin/`；marketplace manifest 在
 路徑預設限制在目前 `session.root()`。額外目錄需在 `/plugin` 的 `tui-preview-mod` 設定中明確加入 `roots` 絕對路徑；最多採用 32 個。`autoPreview` 設定控制重新載入時的預設，`on/off` 不會儲存這項設定。`off` 不妨礙明確的路徑預覽。
 
 影片按 `p` 播放／暫停、`h` 往前 5 秒、`l` 往後 5 秒、`r` 重播、`x` 或 Esc 關閉。Markdown 用 `h/l` 或按鈕換頁。先讓 pane 取得鍵盤焦點；原生 `Ctrl-X Tab` 可切換焦點。
+
+### 點選回覆中的路徑
+
+全螢幕介面（`CLAUDE_CODE_NO_FLICKER=1` 或 `/tui fullscreen`）下，Claude 回覆裡的圖片或影片路徑會畫成連結，單擊就開啟預覽 pane。相對路徑以 `session.root()` 為準，絕對路徑須在允許的 roots 內。
+
+- **Cmd+click 由終端處理**：Ghostty 會用 macOS 開啟檔案，Mod 收不到這個點擊；請用單擊。Ctrl／Alt+click 也維持 Claude Code 原本的開啟方式。
+- 只重畫提到媒體路徑的回覆，其餘回覆照原生繪製；不改寫已儲存的訊息，也不改變模型輸入。回覆若含重畫後無法點選的連結（`vscode://`、`mailto:`、Email 等），整則照原生繪製。
+- 點選前不讀取任何檔案；點選後走與 `/preview <path>` 相同的目錄、大小與格式檢查。
+- 只在 Claude Code 會畫可點選連結的終端重畫：Ghostty、iTerm2、WezTerm、kitty、Alacritty、Warp、VS Code 1.72+、tmux 3.4+ 等，判斷方式比照 2.1.289。Terminal.app 與 herdr（`TERM_PROGRAM=herdr`）不在其中，回覆照原生繪製；herdr 設定 `FORCE_HYPERLINK=1` 後才會變成可點選的路徑，見[自訂 API 與 herdr](#自訂-api-與-herdr)。
+- 不想重畫回覆時，在 `/plugin` 的設定把 `clickablePaths` 設為 false。
 
 原生貼圖進入目前 composer 後，約每 500ms 更新預覽列；最多兩張縮圖，其餘透過圖片按鈕明確載入。Read inline 與 composer 共用兩個自動解碼名額，前景 pane 是另外一個明確操作。Mod 不改寫輸入、不提交 prompt、不改變 Read 傳給模型的內容。貼圖若尚未完成、讀取失敗或自動預覽關閉，`/preview pasted` 可能沒有可用快照；可透過圖片按鈕重試。[實作](hooks/register.ts)
 
@@ -81,6 +92,32 @@ plugin manifest 在 `tui-preview-mod/.claude-plugin/`；marketplace manifest 在
 
 不支援 URL、裝置、FIFO、越界檔案或檔案 symlink。PNG bytes 交給原生 `Image`／`ui.blit`；終端無法畫像素時可顯示原生替代文字。這不是獨立播放器，亦不提供無遠端 Claude 的 SSH 檔案瀏覽器。[helper](scripts/media.mjs)
 
+## 自訂 API 與 herdr
+
+settings 使用自訂 `ANTHROPIC_BASE_URL`／`ANTHROPIC_AUTH_TOKEN`，或在 herdr 內執行 Claude 時，用這個指令啟動：
+
+```sh
+claude --settings '{"env":{"DISABLE_TELEMETRY":"1","CLAUDE_CODE_FORCE_TERMINAL_IMAGES":"1","FORCE_HYPERLINK":"1"}}'
+```
+
+| 設定 | 原因 | 代價 |
+| --- | --- | --- |
+| `DISABLE_TELEMETRY=1` | 自訂 API 時，Claude Code 不會向旗標服務取得本程序的 Mods 開關，而是沿用其他程序寫入 `~/.claude.json` 的舊值；舊值為關閉時 `/preview` 不會出現 | 該 session 的實驗功能都改用內建預設（例如不啟用 Artifact 工具），也不送遙測 |
+| `CLAUDE_CODE_FORCE_TERMINAL_IMAGES=1` | herdr 回報的終端名稱是 `libghostty`，Claude Code 不認得就停用圖片 | 終端不支援 Kitty 圖片時畫出空白 |
+| `FORCE_HYPERLINK=1` | 讓回覆中的路徑成為可點選連結 | 所有連結都改用終端超連結輸出 |
+
+herdr 需 0.9.3 以上；0.8.x 即使設定 `kitty_graphics = true`，直接送出的 Kitty 圖片也是空白。直接在 Ghostty 執行時，只有自訂 API 需要第一項。
+
+不想每次加 `--settings`，可把第一項放進 `~/.claude/settings.json` 的 `env`，後兩項只在 herdr 內 export（herdr 的 pane 有 `HERDR_ENV`）：
+
+```sh
+if [[ -n $HERDR_ENV ]]; then
+  export CLAUDE_CODE_FORCE_TERMINAL_IMAGES=1 FORCE_HYPERLINK=1
+fi
+```
+
+用 cc-switch 這類會重寫 `settings.json` 的工具時，`env` 與 `enabledPlugins` 也要寫進它保存的設定，否則切換供應商後會消失。
+
 ## SSH
 
 在檔案所在的遠端主機執行 **Claude Code + 此 Mod + Node／ffmpeg／ffprobe**，再由 client 終端觀看。使用現有可信 SSH 連線即可，不需為 Mod 開 port：
@@ -90,7 +127,9 @@ ssh your-trusted-host
 claude --plugin-dir /absolute/path/on/remote/claude-plugins/tui-preview-mod
 ```
 
-Air → SSH → Pro 解碼 → SSH PNG bytes → Air 的測試收到 8 張不同有效影格；未證明 Air 終端已畫出像素。client 剪貼簿不會因 SSH 自動變成 server 的剪貼簿：先讓圖片真正進入遠端 Claude composer，才有可預覽的附件。
+從 Air 經 SSH 連到 Pro 的 herdr，用上方指令啟動後，Air 的 Ghostty 已畫出圖片像素。client 剪貼簿不會因 SSH 自動變成 server 的剪貼簿：先讓圖片真正進入遠端 Claude composer，才有可預覽的附件。
+
+mosh 只同步文字畫面，不轉送 Kitty 圖片協定，所以經 mosh 看不到像素；pane、按鍵與點選仍可用。需要從 Air 看到像素時請改用 SSH。
 
 ## 更新與移除
 

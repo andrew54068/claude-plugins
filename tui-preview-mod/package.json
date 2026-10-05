@@ -1,6 +1,6 @@
 {
   "name": "claude-code-preview-mod",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "repository": {
     "type": "git",
     "url": "https://github.com/andrew54068/claude-plugins.git",
@@ -11,7 +11,7 @@
   "type": "module",
   "engines": { "node": ">=20" },
   "scripts": {
-    "test": "node --import tsx --test tests/*.test.mjs tests/player.test.mts",
+    "test": "node --import tsx --test tests/*.test.mjs tests/player.test.mts tests/links.test.mts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "check": "yarn typecheck && yarn test"
   },

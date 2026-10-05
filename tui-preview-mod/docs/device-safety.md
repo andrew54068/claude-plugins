@@ -17,7 +17,7 @@
 
 ## 注意事項
 
-1. **原生解碼與本機工具信任** — `scripts/media.mjs:176`、`hooks/register.ts:94`：Node、ffmpeg、ffprobe 以使用者權限執行並繼承環境。未找到環境變數外傳，但惡意工具或 codec 漏洞仍可能接觸環境中的秘密。使用可信、已更新的工具；只預覽可信媒體。自動預覽可在 plugin 設定將 `autoPreview` 設為 false。
+1. **原生解碼與本機工具信任** — `scripts/media.mjs:176`、`hooks/register.ts:98`：Node、ffmpeg、ffprobe 以使用者權限執行並繼承環境。未找到環境變數外傳，但惡意工具或 codec 漏洞仍可能接觸環境中的秘密。使用可信、已更新的工具；只預覽可信媒體。自動預覽可在 plugin 設定將 `autoPreview` 設為 false。
 2. **內部貼圖快取** — `scripts/media.mjs:124-141`：只查當前 cwd／session／image ID，拒絕 session 子目錄與 leaf symlink；但未檢查快取 ownership／mode，且 `CLAUDE_CODE_TMPDIR` 的 base 會 canonicalize。使用可信、非共用可寫的暫存目錄，不把本機快取當成不可竄改的資料庫。
 
 ## 選擇執行時的檢查
