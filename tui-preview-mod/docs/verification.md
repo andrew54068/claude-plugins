@@ -2,6 +2,22 @@
 
 日期：2026-10-03；公開包裝日期：2026-10-04。以下是原始開發版的分層驗證摘要。`0.1.2` 保留相同的執行程式與測試，只調整版本、市集位置與安裝文件。此子目錄以乾淨產品快照加入既有 `claude-plugins` repository，沒有帶入原開發工作樹的 Git 歷史、API 探針、原始 debug log、圖片、主機資料或 session ID。歷史紀錄中的短 commit ID 只用來辨識本機開發版本，不是此 repository 的可查 revision。
 
+## 0.1.3：點選回覆中的路徑（2026-10-05）
+
+以 Claude Code 2.1.289、herdr 0.9.3、全螢幕介面與使用者的自訂 API 設定驗證。live 測試以 `--plugin-dir` 載入工作樹，已安裝的同名外掛在該次停用。
+
+| 層級 | 結果 | 證明與範圍 |
+| --- | --- | --- |
+| Node/helper tests＋core TypeScript | 38 pass、0 fail | 新增 10 項路徑連結規則（含線性時間回歸）與 1 項 helper 接受 root 內絕對路徑 |
+| 官方 native Mod kit | 26 pass、0 fail | 新增 7 項：無媒體路徑照原生、連結與原生列版面、點選經 root 檢查開 pane、被改寫的 href 不開、非終端／非互動／`clickablePaths:false` 照原生、第二次點選取代 pane 並停止舊 helper |
+| 原生 Mod TypeScript | exit0 | 2.1.289 bundled types；暫存 tsconfig 放在 repo 外 |
+| Plugin strict validation | passed | 列出新的 `ui.render{component=AssistantMessage}` |
+| Live 點選 | 通過 | 以 fork resume 開啟舊 session（沒有呼叫模型，也沒有寫出 session 檔）；單擊回覆中的路徑開啟 pane，視窗截圖有圖片像素；Esc 關閉，無 helper 殘留；輸入框內容不變 |
+| Live 版面 | 一致 | 同一則回覆的 15 列文字與原生繪製逐列相同，含上方空行 |
+| herdr 內的超連結 | 需 `FORCE_HYPERLINK=1` | 未設定時連結畫成「路徑 (file:///…)」，單擊沒有送到 Mod；設定後送達 |
+
+6 次單擊中 5 次送達。唯一未送達的一次，緊接在測試程式切換 herdr 分頁、畫面重新排版之後；之後 3 次重試都送達。這是測試流程中的觀察，未確認原因。
+
 ## 分層證據
 
 | 層級 | 結果 | 證明與範圍 |
@@ -89,9 +105,11 @@ SSH測試沿既有可信連線從Air啟動Pro的helper，由Air解析NDJSON與PN
 
 ## 尚需實測
 
-1. 支援圖片協定的真實終端畫出PNG與連續影片像素，包含close後清理。
+1. 連續影片的可見像素（圖片像素已在 Ghostty 與 herdr 0.9.3 實測）。
 2. client圖片確實進入遠端composer，並在送出前顯示；與SSH bytes分開驗證。
 3. live Read、resume及其他reload／停用／移除流程的helper／timer清理。
 4. 其他Claude、Node、ffmpeg／codec／作業系統版本，以及tmux／screen。
+5. 0.1.3 正式安裝後，從 Air 經 SSH 單擊回覆路徑看到像素。
+6. mosh 的像素中繼：尚未實作，目前經 mosh 看不到圖片。
 
 以上缺口不影響已有測試紀錄的真實性，但限制README與相容性表可聲稱的範圍。

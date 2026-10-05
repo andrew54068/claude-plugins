@@ -4,7 +4,7 @@
 
 Claude Code Mods 以使用者權限執行，可具有檔案、程序、網路、session、提示改寫、模型呼叫及工具核准能力；Claude 的 Bash sandbox 不約束 Mod 啟動的 subprocess。因此，載入前必須信任與審閱程式碼，不能因為它是預覽介面就視為沙箱。[官方權限說明](https://code.claude.com/docs/en/plugins/mods/overview)
 
-本專案實際使用 `$.process.spawn`、`$.clock.every`、`$.prompt.read`、`$.session.root/id`、命令註冊與原生 UI 方法。它沒有使用 `$.http`、`$.model`、`$.mcp`、tool approval、prompt.fill／submit／rewrite 或 session history。在 `tui-preview-mod/` 執行 `claude plugin validate --strict .claude-plugin/plugin.json` 可列出 Mod 的 hooks／calls；repository 的 marketplace 用 `claude plugin validate ../.claude-plugin/marketplace.json` 另查。只驗證 repository 根目錄會選 marketplace，漏掉 Mod。footprint 清單也不會證明 Node helper 或 ffmpeg 沒有問題，仍需閱讀 [register.ts](hooks/register.ts) 與 [media.mjs](scripts/media.mjs)。
+本專案實際使用 `$.process.spawn`、`$.clock.every`、`$.prompt.read`、`$.session.root/id`、命令註冊與原生 UI 方法，並重畫提到媒體路徑的回覆（`AssistantMessage` 的 render hook）。它沒有使用 `$.http`、`$.model`、`$.mcp`、tool approval、prompt.fill／submit／rewrite 或 session history。在 `tui-preview-mod/` 執行 `claude plugin validate --strict .claude-plugin/plugin.json` 可列出 Mod 的 hooks／calls；repository 的 marketplace 用 `claude plugin validate ../.claude-plugin/marketplace.json` 另查。只驗證 repository 根目錄會選 marketplace，漏掉 Mod。footprint 清單也不會證明 Node helper 或 ffmpeg 沒有問題，仍需閱讀 [register.ts](hooks/register.ts) 與 [media.mjs](scripts/media.mjs)。
 
 ## 資料流
 
@@ -13,6 +13,7 @@ Claude Code Mods 以使用者權限執行，可具有檔案、程序、網路、
 | `/preview <path>` | 目前 session root，或明確設定的額外 roots；Node 開啟驗證後的一般檔案 | Markdown 或 PNG bytes 交給 Claude 終端 UI |
 | 目前 composer 貼圖 | 當前 prompt 中的圖片 ID；同一 root/session 的有限快取候選檔名 | 送出前預覽列／使用者開啟的 pane |
 | 原生 Read 圖片 | 既有成功工具結果中的 base64，透過 stdin 解碼；不重新讀來源路徑 | 保留原生工具結果並增加 inline 預覽 |
+| 回覆中的媒體路徑 | 只比對文字，不讀檔；使用者單擊後才以 `/preview <path>` 相同的 root 檢查開啟 | 路徑畫成連結，點選後開 pane；儲存的訊息與模型輸入不變 |
 | SSH | 解碼在 server；PNG bytes 沿既有 SSH stream 回 client | 圖像能否畫出取決於 client 終端與協定 |
 
 此 Mod 不新增圖片上傳、模型請求或 HTTP listener。**這不代表整個 Claude session 離線或圖片永不送出：一般提交的附件與 Read 結果仍可能由 Claude 傳給其設定的模型。** 預覽不改變這項原生行為。helper／ffmpeg 繼承程序環境並以使用者權限執行；未建立 OS 沙箱或隔離秘密的執行環境。
@@ -27,9 +28,9 @@ subprocess 使用 argv、無 shell。ffmpeg／ffprobe protocol 白名單為 `fil
 
 Markdown 2 MiB、靜態圖 32 MiB、影片 2 GiB；frame 2 MiB、640×360、影片8 fps。pane 限制在來源前600秒；helper 每次至多600秒／4800幀。ffprobe／靜態／影片 timeout 分別為15／20／615秒。ffmpeg `-max_alloc 64 MiB` 只限制單次 allocation，**不是整個程序的記憶體硬上限**。限額與白名單不取代原生 codec 的安全更新。
 
-Read inline 與 composer 共用兩個自動解碼名額，另外可有一個前景 pane；Read decoded cache 至多16項，session內至多128個自動 Read attempt，超過後改由明確按鈕載入。這些是資源限制，並非總記憶體或 OS 權限沙箱。[自動排程](hooks/register.ts#L66)
+Read inline 與 composer 共用兩個自動解碼名額，另外可有一個前景 pane；Read decoded cache 至多16項，session內至多128個自動 Read attempt，超過後改由明確按鈕載入。這些是資源限制，並非總記憶體或 OS 權限沙箱。[自動排程](hooks/register.ts#L72)
 
-暫停、跳轉、關閉、session.end 與錯誤會停止舊 stream；世代與 pane identity 防止舊結果復活。helper 在 SIGTERM／輸出關閉後清理 ffmpeg，必要時500ms後 SIGKILL。live pause／seek／close、播放中 `/clear` 後重新預覽，以及程式變動觸發的 hot reload／舊 module 卸載都有清理證據。hot reload 出現一次舊環境 `ui.invalidate` 被丟棄的 WARN，未留下 decoder；resume 與其他卸載情境未單獨實測。[生命週期](hooks/register.ts#L40)、[驗證紀錄](docs/verification.md)
+暫停、跳轉、關閉、session.end 與錯誤會停止舊 stream；世代與 pane identity 防止舊結果復活。helper 在 SIGTERM／輸出關閉後清理 ffmpeg，必要時500ms後 SIGKILL。live pause／seek／close、播放中 `/clear` 後重新預覽，以及程式變動觸發的 hot reload／舊 module 卸載都有清理證據。hot reload 出現一次舊環境 `ui.invalidate` 被丟棄的 WARN，未留下 decoder；resume 與其他卸載情境未單獨實測。[生命週期](hooks/register.ts#L42)、[驗證紀錄](docs/verification.md)
 
 ## 回報問題
 
