@@ -8,6 +8,7 @@
   "license": "MIT",
   "userConfig": {
     "roots": { "type": "string", "multiple": true, "title": "額外預覽目錄", "description": "工作階段根目錄以外可讀取的絕對路徑", "default": [] },
-    "autoPreview": { "type": "boolean", "title": "自動圖片預覽", "description": "顯示 Read 圖片與送出前的貼圖", "default": true }
+    "autoPreview": { "type": "boolean", "title": "自動圖片預覽", "description": "顯示 Read 圖片與送出前的貼圖", "default": true },
+    "clickablePaths": { "type": "boolean", "title": "可點擊的媒體路徑", "description": "全螢幕介面中，回覆裡的圖片或影片路徑可直接點開預覽", "default": true }
   }
 }

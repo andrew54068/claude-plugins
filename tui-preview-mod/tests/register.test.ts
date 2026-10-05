@@ -410,3 +410,100 @@ test('successful video blits redraw the clock once per displayed second with aut
   }
   expect(state.activeVideo).toBe(0);
 });
+
+const reply = (text: string, isFirstOfReply = true, surface: 'terminal' | 'desktop' = 'terminal') => ({ plugin: PLUGIN, surface, component: 'AssistantMessage', requestId: 'reply1', viewport: { columns: 80, rows: 30, isFullscreen: true }, props: { text, isFirstOfReply } } as const);
+const HREF = 'file:///work/content/a.png';
+const helperCalls = (state: { requests: ProcessSpawnRequest[] }) => state.requests.map(request => request.argv.slice(2));
+
+test('a reply without a media path keeps the engine drawing', async ($, on) => {
+  host(on);
+  await $.session.start(START);
+  for (const text of ['All done, see README.md and src/main.ts', 'see /etc/a.png', `${'x'.repeat(10_001)} a/b.png`]) {
+    const ui = await $.ui.mount(reply(text));
+    expect(await ui.find({ type: 'Text', text: '原生輸出' })).toBeDefined();
+    expect(await ui.find({ type: 'Markdown' })).toBeUndefined();
+    await ui.unmount();
+  }
+});
+
+test('a reply naming an image path draws the path as a link the Mod answers, in the core row layout', async ($, on) => {
+  host(on);
+  await $.session.start(START);
+  const ui = await $.ui.mount(reply('Saved `content/a.png`.'));
+  const markdown = await ui.find({ type: 'Markdown', key: 'reply-paths' });
+  expect(markdown?.props.text).toBe(`Saved [\`content/a.png\`](${HREF}).`);
+  expect(markdown?.props.pressableLinks).toEqual([HREF]);
+  expect(await ui.find({ type: 'Text', text: '⏺' })).toBeDefined();
+  expect((await ui.find({ type: 'Box' }))?.props).toEqual(expect.objectContaining({ flexDirection: 'row', marginTop: 1 }));
+  await ui.unmount();
+  const continued = await $.ui.mount(reply('Saved `content/a.png`.', false));
+  expect(await continued.find({ type: 'Text', text: '⏺' })).toBeUndefined();
+  await continued.unmount();
+});
+
+test('pressing the path opens the preview pane through the root-checked helper', async ($, on) => {
+  const { clock, state } = host(on);
+  await $.session.start(START);
+  const ui = await $.ui.mount(reply('Saved `content/a.png`.'));
+  await ui.press({ key: 'reply-paths', link: { href: HREF } });
+  await clock.settle();
+  expect(state.opened).toBe(1);
+  expect(helperCalls(state)).toEqual([['inspect', '--root', '/work', '--path', '/work/content/a.png'], ['image', '--root', '/work', '--path', '/work/content/a.png']]);
+  const pane = await $.ui.mount(PANE);
+  expect(await pane.find({ type: 'Image' })).toBeDefined();
+  await pane.unmount(); await ui.unmount();
+});
+
+test('a press whose href was rewritten to a path it never drew spawns nothing', async ($, on) => {
+  const { clock, state } = host(on);
+  on('ui.press', ($, e, next) => next({ ...e, link: { href: 'file:///etc/a.png' } }));
+  await $.session.start(START);
+  const ui = await $.ui.mount(reply('Saved `content/a.png`.'));
+  await ui.press({ key: 'reply-paths', link: { href: HREF } });
+  await clock.settle();
+  expect(state.requests.length).toBe(0);
+  expect(state.opened).toBe(0);
+  await ui.unmount();
+});
+
+test('replies stay core-drawn off the terminal and in non-interactive sessions', async ($, on) => {
+  host(on);
+  await $.session.start({ ...START, isInteractive: false });
+  const quiet = await $.ui.mount(reply('Saved `content/a.png`.'));
+  expect(await quiet.find({ type: 'Markdown' })).toBeUndefined();
+  await quiet.unmount();
+  await $.session.start(START);
+  const desktop = await $.ui.mount(reply('Saved `content/a.png`.', true, 'desktop'));
+  expect(await desktop.find({ type: 'Markdown' })).toBeUndefined();
+  await desktop.unmount();
+});
+
+test('clickablePaths off keeps every reply core-drawn', { options: { clickablePaths: false } }, async ($, on) => {
+  host(on);
+  await $.session.start(START);
+  const ui = await $.ui.mount(reply('Saved `content/a.png`.'));
+  expect(await ui.find({ type: 'Text', text: '原生輸出' })).toBeDefined();
+  expect(await ui.find({ type: 'Markdown' })).toBeUndefined();
+  await ui.unmount();
+});
+
+test('a second path press replaces the pane and stops the first helper', { timeoutMs: 10_000 }, async ($, on) => {
+  const { clock, state } = host(on);
+  await $.session.start(START);
+  const ui = await $.ui.mount(reply('Clip `clip/a.mp4` and still `img/b.png`.'));
+  try {
+    await ui.press({ key: 'reply-paths', link: { href: 'file:///work/clip/a.mp4' } });
+    await clock.advance(300);
+    expect(state.activeVideo).toBe(1);
+    const replacing = ui.press({ key: 'reply-paths', link: { href: 'file:///work/img/b.png' } });
+    await clock.advance(300); await replacing; await clock.settle();
+    expect(state.activeVideo).toBe(0);
+    expect(helperCalls(state).at(-1)).toEqual(['image', '--root', '/work', '--path', '/work/img/b.png']);
+    const pane = await $.ui.mount(PANE);
+    expect(await pane.find({ type: 'Image' })).toBeDefined();
+    await pane.unmount();
+  } finally {
+    const ending = $.session.end({ reason: 'prompt_input_exit', sessionId: state.id, resume: { id: state.id } });
+    await clock.advance(300); await ending; await ui.unmount();
+  }
+});

@@ -2,6 +2,7 @@ import type { CoreEngineInterface, HookStream, ProcessSpawnChunk, ProcessSpawnRe
 import { NdjsonParser } from './protocol.ts';
 import type { HeaderRecord, FrameRecord, MarkdownRecord } from './protocol.ts';
 import { Player } from './player.ts';
+import { linkifyMediaPaths, pathFromHref } from './links.ts';
 
 type Api = CoreEngineInterface;
 type Job = { stream: HookStream<ProcessSpawnChunk, ProcessSpawnResult>; stopped: boolean; stopping?: Promise<void> };
@@ -18,6 +19,7 @@ const time = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.flo
 
   let options: PluginOptions = {};
   let automatic = true;
+  let clickable = true;
   let interactive = false;
   let polling: Timer | undefined;
   let pollBusy = false;
@@ -205,9 +207,10 @@ const time = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.flo
     void consume($, argv($, ['video', ...target.source, '--start', String(player.position)]), target,
       () => pane === target && target.generation === own && target.player?.generation === generation, undefined, generation);
   }
+  const extraRoots = () => Array.isArray(options.roots) ? options.roots.filter((value): value is string => typeof value === 'string' && value.startsWith('/')).slice(0, 32) : [];
   async function inspect($: Api, path: string, target: View, current: () => boolean) {
     const root = await $.session.root();
-    const extra = Array.isArray(options.roots) ? options.roots.filter(value => typeof value === 'string' && value.startsWith('/')).slice(0, 32) : [];
+    const extra = extraRoots();
     let reason = 'ROOT';
     for (const allowed of [root, ...extra]) {
       const source = ['--root', allowed, '--path', path];
@@ -220,6 +223,26 @@ const time = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.flo
       if (!['ROOT', 'IO'].includes(reason)) break;
     }
     throw new Error(reason);
+  }
+  // `/preview <path>` and a pressed reply path share one opening: same cancel and decoder semantics.
+  async function previewPath($: Api, path: string) {
+    const target = view();
+    if (!await openPane($, target)) return '預覽已取消。';
+    const own = ++target.generation;
+    try {
+      const result = await inspect($, path, target, () => pane === target && target.generation === own);
+      if (pane !== target || target.generation !== own) return '預覽已取消。';
+      target.header = result.header; target.source = result.source;
+      target.loading = true;
+      if (result.header.kind === 'video') {
+        target.player = new Player(Math.min(600, result.header.duration ?? 0));
+        await play($, target);
+      } else await consume($, argv($, [result.header.kind, ...result.source]), target, () => pane === target && target.generation === own);
+      redraw($);
+    } catch (error) {
+      if (pane === target) { target.error = `無法預覽：${message(error instanceof Error ? error.message : 'DECODE')}`; target.loading = false; redraw($); }
+    }
+    return target.error || `已開啟預覽：${target.header?.name ?? '檔案'}。`;
   }
   async function poll($: Api) {
     if (!interactive || !automatic || pollBusy || resetting) return;
@@ -271,6 +294,7 @@ const time = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.flo
 export const register: Register = (on, configuration) => {
   options = configuration;
   automatic = options.autoPreview !== false;
+  clickable = options.clickablePaths !== false;
   on('session.start', async ($, e, next) => {
     await reset();
     interactive = e.isInteractive && e.surface === 'terminal';
@@ -310,23 +334,7 @@ export const register: Register = (on, configuration) => {
       return { text: '已開啟貼圖預覽；原輸入內容不會改寫。' };
     }
     const path = ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("'") && text.endsWith("'"))) ? text.slice(1, -1) : text;
-    const target = view();
-    if (!await openPane($, target)) return { text: '預覽已取消。' };
-    const own = ++target.generation;
-    try {
-      const result = await inspect($, path, target, () => pane === target && target.generation === own);
-      if (pane !== target || target.generation !== own) return { text: '預覽已取消。' };
-      target.header = result.header; target.source = result.source;
-      target.loading = true;
-      if (result.header.kind === 'video') {
-        target.player = new Player(Math.min(600, result.header.duration ?? 0));
-        await play($, target);
-      } else await consume($, argv($, [result.header.kind, ...result.source]), target, () => pane === target && target.generation === own);
-      redraw($);
-    } catch (error) {
-      if (pane === target) { target.error = `無法預覽：${message(error instanceof Error ? error.message : 'DECODE')}`; target.loading = false; redraw($); }
-    }
-    return { text: target.error || `已開啟預覽：${target.header?.name ?? '檔案'}。` };
+    return { text: await previewPath($, path) };
   });
   on('ui.close', { id: 'preview' }, async ($, e, next) => { await closePane($, false); return next(e); });
   on('ui.render', { component: 'Pane', requestId: 'preview' }, async ($, e, next) => {
@@ -398,5 +406,24 @@ export const register: Register = (on, configuration) => {
     if (!cached || cached.data !== data) return Box({ flexDirection: 'column', children: [base, Button({ key: 'read-preview', label: '顯示圖片', onPress: async () => openInline($, data) })] });
     const picture = image($, e, cached.view, Math.min(80, e.viewport?.columns ?? 80), 16);
     return Box({ flexDirection: 'column', children: [base, ...(picture ? [picture] : [Text({ dimColor: true, children: [cached.view.error || '正在準備圖片預覽…'] })])] });
+  });
+  // A reply naming media paths is redrawn with those paths as links this Mod answers on a plain
+  // click; the stored message and the model's input stay as they were, and nothing is read until then.
+  on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
+    if (e.surface !== 'terminal' || !interactive || !clickable || resetting) return next(e);
+    const renderingEpoch = epoch;
+    const root = await $.session.root();
+    const reply = renderingEpoch === epoch ? linkifyMediaPaths(e.props.text, root, extraRoots()) : undefined;
+    if (!reply) return next(e);
+    const { Box, Text, Markdown } = $.ui.resolve(e);
+    // Core's reply row: a margin, the bullet gutter on a reply's first block, then the prose.
+    return Box({ flexDirection: 'row', alignItems: 'flex-start', width: '100%', marginTop: 1, children: [
+      ...(e.props.isFirstOfReply ? [Box({ minWidth: 2, children: [Text({ children: ['⏺'] })] })] : []),
+      Box({ flexDirection: 'column', children: [Markdown({ key: 'reply-paths', text: reply.text, pressableLinks: [...reply.links.keys()], onLinkPress: link => {
+        // A hook beneath may rewrite the href: only a path this drawing linked opens.
+        const path = pathFromHref(link.href);
+        if (path && [...reply.links.values()].includes(path) && interactive && !resetting) void previewPath($, path);
+      } })] }),
+    ] });
   });
 };
