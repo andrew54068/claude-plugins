@@ -8,8 +8,8 @@
 
 | 層級 | 結果 | 證明與範圍 |
 | --- | --- | --- |
-| Node/helper tests＋core TypeScript | 38 pass、0 fail | 新增 10 項路徑連結規則（含線性時間回歸）與 1 項 helper 接受 root 內絕對路徑 |
-| 官方 native Mod kit | 26 pass、0 fail | 新增 7 項：無媒體路徑照原生、連結與原生列版面、點選經 root 檢查開 pane、被改寫的 href 不開、非終端／非互動／`clickablePaths:false` 照原生、第二次點選取代 pane 並停止舊 helper |
+| Node/helper tests＋core TypeScript | 39 pass、0 fail | 新增 11 項路徑連結規則（含線性時間與參考式連結定義的回歸）與 1 項 helper 接受 root 內絕對路徑 |
+| 官方 native Mod kit | 27 pass、0 fail | 新增 8 項：無媒體路徑照原生、連結與原生列版面、點選經 root 檢查開 pane、被改寫的 href 不開、主畫面（非全螢幕）／非終端／非互動／`clickablePaths:false` 照原生、第二次點選取代 pane 並停止舊 helper |
 | 原生 Mod TypeScript | exit0 | 2.1.289 bundled types；暫存 tsconfig 放在 repo 外 |
 | Plugin strict validation | passed | 列出新的 `ui.render{component=AssistantMessage}` |
 | Live 點選 | 通過 | 以 fork resume 開啟舊 session（沒有呼叫模型，也沒有寫出 session 檔）；單擊回覆中的路徑開啟 pane，視窗截圖有圖片像素；Esc 關閉，無 helper 殘留；輸入框內容不變 |

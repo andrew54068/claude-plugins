@@ -13,7 +13,8 @@
 - Cmd+click 由終端處理，Mod 收不到；Ctrl／Alt+click 維持 Claude Code 原本的開啟方式。
 - 點選前不讀檔。點選後一樣經過 `media.mjs` 的 root、檔案類型、大小檢查；Mod 端的 root 比對只決定要不要畫成連結。
 - 已儲存的訊息、模型輸入與 Read 結果都不變；沒有新增模型請求或上傳。
-- 每則回覆最多 256 個連結、10000 字元；超過時照原生繪製。程式碼區塊、網址、圖片語法與 `~/` 路徑不轉換。
+- 只在全螢幕介面重畫；主畫面收不到點擊，回覆照原生繪製。
+- 每則回覆最多 256 個連結、10000 字元；超過時照原生繪製。程式碼區塊、網址、圖片語法與 `~/` 路徑不轉換；參考式連結的定義只改目的地。
 
 ## 文件
 
@@ -22,7 +23,7 @@
 
 ## 驗證
 
-38／38 core tests、26／26 native kit tests、2.1.289 原生 TypeScript 與 strict validation 通過。herdr 0.9.3 內的 live 測試：單擊路徑開啟 pane 並畫出圖片像素、Esc 關閉無 helper 殘留、沒有模型請求。細節見[驗證紀錄](verification.md)。
+39／39 core tests、27／27 native kit tests、2.1.289 原生 TypeScript 與 strict validation 通過。herdr 0.9.3 內的 live 測試：單擊路徑開啟 pane 並畫出圖片像素、Esc 關閉無 helper 殘留、沒有模型請求。細節見[驗證紀錄](verification.md)。
 
 ## 仍未驗證
 
