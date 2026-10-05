@@ -76,3 +76,10 @@ test('long unbroken tokens are scanned in linear time', () => {
     assert.ok(performance.now() - start < 100, `${text.slice(0, 6)}… took ${(performance.now() - start).toFixed(0)}ms`);
   }
 });
+
+test('a reference definition keeps its shape and points the reference at the file', () => {
+  const reply = linked('See [the shot][1] and [web][2].\n\n[1]: docs/a.png "Cover"\n[2]: https://x.dev/b.png');
+  assert.equal(reply?.text, 'See [the shot][1] and [web][2].\n\n[1]: file:///work/docs/a.png "Cover"\n[2]: https://x.dev/b.png');
+  assert.deepEqual([...reply!.links.values()], ['/work/docs/a.png']);
+  assert.equal(linked('[1]: notes/readme.md'), undefined);
+});

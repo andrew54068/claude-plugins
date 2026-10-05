@@ -7,6 +7,7 @@ const MEDIA = new RegExp(`\\.(?:${EXTENSIONS})$`, 'i');
 const CONTROL = /[\u0000-\u001f\u007f]/;
 const SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
 const FENCE = /^ {0,3}(`{3,}|~{3,})/;
+const REFERENCE = /^( {0,3}\[[^\]\n]+\]:[ \t]*)<?([^\s<>]+)>?(.*)$/;
 // Markdown link, code span, <autolink or HTML>, URL, then one maximal run of path
 // characters: no nested quantifier, so a long unbroken token is scanned once. Bare
 // paths are ASCII so prose glued to them (存到content/a.png了) stays outside the link.
@@ -90,6 +91,13 @@ export function linkifyMediaPaths(markdown: string, root: string, extraRoots: re
       return line;
     }
     if (marker) { fence = { char: marker[0]!, size: marker.length }; return line; }
+    // A reference definition keeps its shape: only its destination may become the file href.
+    const definition = REFERENCE.exec(line);
+    if (definition) {
+      const target = definition[2]!;
+      const href = hrefOf(target.startsWith('file:') ? mediaPath(pathFromHref(target) ?? '') : mediaPath(target));
+      return href ? `${definition[1]}${href}${definition[3]}` : line;
+    }
     return linkLine(line);
   });
   const text = lines.join('\n');
