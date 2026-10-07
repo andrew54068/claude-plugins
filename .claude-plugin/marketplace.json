@@ -44,7 +44,7 @@
     {
       "name": "tui-preview-mod",
       "source": "./tui-preview-mod",
-      "description": "在 Claude Code 終端預覽 Markdown、圖片、無聲影片與送出前的貼圖。",
+      "description": "在 Claude Code 終端預覽 Markdown、圖片、無聲影片與送出前的貼圖。自訂 API 或 herdr 需另設環境變數，見 README。",
       "version": "0.1.3",
       "license": "MIT"
     }
