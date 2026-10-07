@@ -8,6 +8,8 @@
 
 需要可使用 Mods 的 Claude Code、互動式終端，以及執行 Claude 的主機上已安裝的 Node.js 20+、ffmpeg、ffprobe。Node 必須在 Claude 程序的 PATH；媒體工具在 `/opt/homebrew/bin`、`/usr/local/bin` 或 `/usr/bin` 查找。測試環境為 Node 26.8.1、ffmpeg／ffprobe 9.0.2，並未驗證所有 Node／codec 版本。
 
+**使用自訂 `ANTHROPIC_BASE_URL`，或在 herdr 內執行 Claude 時**，安裝後還要設定環境變數；否則 `/preview` 可能不會出現、圖片空白，回覆中的路徑也無法點選。做法與代價見[自訂 API 與 herdr](#自訂-api-與-herdr)。
+
 執行不需要 Yarn、`node_modules`、MCP server、瀏覽器或 HTTP port。先閱讀 [權限與資料邊界](SECURITY.md)，再從你已取得並信任的專案目錄載入：
 
 ### 從 GitHub 安裝（建議）
@@ -33,7 +35,7 @@
 
 再安裝 `tui-preview-mod@andrew54068`，並從 Configure 重新套用先前記下的設定；尤其是曾設為 false 的 `autoPreview`，否則會恢復預設 true。`andrew54068` 是 marketplace 名稱；`tui-preview-mod` 是 plugin 名稱；本版為 `0.1.3`。舊 `preview-mods` 來源可保留；切換來源不是用來繞過 Mod 開關。
 
-GitHub 安裝只改變取得外掛的方式，**不能保證 `/preview` 一定可用**。若仍缺少指令，執行 `/plugin` 檢查 `mods active`，並在 shell 執行 `claude plugin test` 查看載入限制；組織政策或 Anthropic 的 Mod 開關仍可拒絕它。[官方診斷](https://code.claude.com/docs/en/plugins/mods/troubleshoot)
+GitHub 安裝只改變取得外掛的方式，**不能保證 `/preview` 一定可用**。使用自訂 API 時，最常見的原因是 Mods 開關沿用磁碟快取裡的舊值，先依[自訂 API 與 herdr](#自訂-api-與-herdr)設定 `DISABLE_TELEMETRY=1`。若仍缺少指令，執行 `/plugin` 檢查 `mods active`，並在 shell 執行 `claude plugin test` 查看載入限制；組織政策或 Anthropic 的 Mod 開關仍可拒絕它。[官方診斷](https://code.claude.com/docs/en/plugins/mods/troubleshoot)
 
 ### 不安裝的本機開發試用
 

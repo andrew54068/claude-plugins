@@ -1,7 +1,7 @@
 {
   "name": "tui-preview-mod",
   "version": "0.1.3",
-  "description": "在 Claude Code 終端預覽 Markdown、圖片、影片與送出前的貼圖",
+  "description": "在 Claude Code 終端預覽 Markdown、圖片、影片與送出前的貼圖；自訂 API 或 herdr 需另設環境變數，見 README",
   "author": { "name": "Dawson" },
   "homepage": "https://github.com/andrew54068/claude-plugins/tree/main/tui-preview-mod",
   "repository": "https://github.com/andrew54068/claude-plugins",
