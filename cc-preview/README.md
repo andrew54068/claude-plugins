@@ -1,8 +1,7 @@
 # cc-preview
 
 A Claude Code mod that previews the images and markdown files of a conversation: hover cards in
-the transcript, thumbnails above the prompt, and a side pane to read or browse them. It covers
-everything [cc-image-view](https://github.com/GGGODLIN/cc-mod-image-view) does, so it replaces it.
+the transcript, thumbnails above the prompt, and a side pane to read or browse them.
 
 - **Pasted images in the prompt:** while the draft holds `[Image #n]` tags, a row of thumbnails
   sits above the prompt. Press `#n ⤢` under one to open it in the pane.
@@ -28,14 +27,6 @@ From the `andrew54068` marketplace:
 ```sh
 claude plugin marketplace add andrew54068/claude-plugins
 claude plugin install cc-preview@andrew54068 --scope user
-```
-
-cc-preview replaces `tui-preview-mod` and `cc-image-view`: they draw in the same places, and
-tui-preview-mod registers `/preview` too, so whichever sits above wins. Uninstall or disable them:
-
-```sh
-claude plugin uninstall tui-preview-mod@andrew54068
-claude plugin disable cc-image-view@cc-mod-image-view
 ```
 
 Or for one session from a clone: `claude --plugin-dir /path/to/claude-plugins/cc-preview`.
