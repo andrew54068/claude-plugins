@@ -1,0 +1,12 @@
+Parts of hooks/ (the paste-cache lookup, the PNG converters, the private scratch
+folder check, the hover cards, the thumbnail layout and the language picking) are
+adapted from GGGODLIN/cc-mod-image-view
+at commit 1544b15355515e240af30b3aa7cd8b3b0a899591, itself adapted from
+jarrodwatts/claude-image-view at commit 12795b62f1c17f4b36c980e33672fbdff3a6731a.
+
+https://github.com/GGGODLIN/cc-mod-image-view/tree/1544b15355515e240af30b3aa7cd8b3b0a899591
+https://github.com/jarrodwatts/claude-image-view/tree/12795b62f1c17f4b36c980e33672fbdff3a6731a
+
+Original work Copyright (c) 2026 Jarrod Watts, licensed under the MIT License.
+See LICENSE. The plugin id here is cc-preview so it does not share either
+upstream plugin name.
