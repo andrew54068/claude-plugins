@@ -40,16 +40,28 @@ claude plugin disable cc-image-view@cc-mod-image-view
 
 Or for one session from a clone: `claude --plugin-dir /path/to/claude-plugins/cc-preview`.
 
-Needs Claude Code 2.1.289 or later. Pictures need a terminal with kitty graphics (Ghostty, kitty),
-or block mode (below); markdown draws in any terminal.
+Needs Claude Code 2.1.289 or later. Markdown draws in any terminal. Pictures draw in kitty
+graphics where Claude Code knows the terminal shows them (Ghostty, kitty, WezTerm, found from
+`TERM_PROGRAM` / `TERM`), and in block characters everywhere else (below), so nothing needs
+setting up to see them.
+
+Herdr passes kitty graphics but reports `TERM=xterm-256color`, so Claude Code can't tell and
+pictures fall back to blocks. For graphics, tell it in `~/.zshrc` or `~/.bashrc` (new panes only):
+
+```sh
+if [ -n "$HERDR_ENV" ]; then
+  export CLAUDE_CODE_FORCE_TERMINAL_IMAGES=1
+fi
+```
+
+The pane's mode button names what was found: `▣ Graphics · …` or `▦ Blocks · …`.
 
 ## Pictures over ssh, mosh and multiplexers
 
 Every picture is sent to the terminal as bytes, never as a file name, so it shows when Claude Code
 runs on another machine.
 
-- **ssh:** kitty graphics pass through. In Herdr, export `CLAUDE_CODE_FORCE_TERMINAL_IMAGES=1` when
-  `HERDR_ENV=1` (Herdr passes the graphics, but Claude Code can't tell).
+- **ssh:** kitty graphics pass through.
 - **Graphics or characters, found for you.** Pictures use kitty graphics only where they are known
   to reach the screen; everywhere else they are drawn in quadrant block characters (`▘▝▀▖▌▞▛`,
   four pixels a cell, 24-bit color), which every terminal and mosh carry. The terminal can't be
