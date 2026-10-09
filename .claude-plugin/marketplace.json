@@ -45,7 +45,7 @@
     {
       "name": "cc-preview",
       "source": "./cc-preview",
-      "description": "Preview the images and markdown files of a conversation in Claude Code: hover cards, pasted-image thumbnails above the prompt, and a side pane. Pictures show over ssh, and over mosh in block characters. Replaces tui-preview-mod.",
+      "description": "Preview the images and markdown files of a conversation in Claude Code: hover cards, pasted-image thumbnails above the prompt, and a side pane. Pictures show over ssh, and over mosh in block characters.",
       "version": "0.3.0",
       "license": "MIT"
     }

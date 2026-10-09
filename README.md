@@ -12,7 +12,7 @@ A collection of Claude Code plugins. Each plugin can be installed independently.
 | [skills-manager](./skills-manager) | Manage per-project skills, plugins, and MCP servers via a bullpen + symlink pattern (Claude + Codex) |
 | [ralph-expert](./ralph-expert) | Turn a vague task into a well-structured Ralph Loop prompt with completion criteria and a max-iteration safety net (requires the `ralph-loop` plugin) |
 | [open-source-prep](./open-source-prep) | Prepare a private codebase for safe open-source release with secret scanning, license guidance, and standard repository documentation |
-| [cc-preview](./cc-preview) | 在 Claude Code 預覽對話裡的圖片與 Markdown：滑鼠移上去看預覽、送出前的貼圖縮圖、側邊面板；ssh 顯示真實像素，mosh 用方塊字元畫圖。取代 tui-preview-mod |
+| [cc-preview](./cc-preview) | 在 Claude Code 預覽對話裡的圖片與 Markdown：滑鼠移上去看預覽、送出前的貼圖縮圖、側邊面板；ssh 顯示真實像素，mosh 用方塊字元畫圖 |
 
 ## Install
 
@@ -47,8 +47,6 @@ Or from a local path:
 claude plugin marketplace update andrew54068
 claude plugin install cc-preview@andrew54068
 ```
-
-cc-preview 取代 `tui-preview-mod`：兩者畫在同一個位置，也都註冊 `/preview`，同時開啟時舊的會蓋掉新的。安裝前先移除舊外掛（`/plugin uninstall tui-preview-mod@andrew54068`）；若裝過 cc-image-view 也一併停用。影片預覽沒有跟著搬過來。
 
 程式在 [cc-preview/](./cc-preview)，需要 Claude Code 2.1.289 以上。說明、ssh／mosh 的行為與權限範圍見該目錄的 README。
 
