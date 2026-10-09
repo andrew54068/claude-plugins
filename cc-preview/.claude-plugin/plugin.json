@@ -1,0 +1,46 @@
+{
+  "name": "cc-preview",
+  "description": "Preview images and markdown files from the conversation and the prompt: hover cards, and a side pane to browse them",
+  "version": "0.3.0",
+  "author": {
+    "name": "dawson wang"
+  },
+  "license": "MIT",
+  "keywords": [
+    "images",
+    "markdown",
+    "preview",
+    "paste",
+    "thumbnails",
+    "pane",
+    "mosh",
+    "mod",
+    "terminal",
+    "claude-code"
+  ],
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "pictures": {
+      "type": "string",
+      "title": "Pictures",
+      "description": "How pictures are drawn. graphics: kitty graphics (kitty, Ghostty, WezTerm). blocks: colored block characters, which every terminal and mosh carry. auto: graphics only where they are known to reach the screen (no mosh on the way, a terminal that draws them), else blocks; looked at again every 5 s.",
+      "default": "auto",
+      "options": [
+        "auto",
+        "graphics",
+        "blocks"
+      ]
+    },
+    "language": {
+      "type": "string",
+      "title": "Language",
+      "description": "UI language. auto follows Claude Code's language setting, then LC_ALL / LANG, else English.",
+      "default": "auto",
+      "options": [
+        "auto",
+        "en",
+        "zh-TW"
+      ]
+    }
+  }
+}
