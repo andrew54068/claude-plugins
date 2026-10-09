@@ -4,6 +4,7 @@
     "name": "Dawson",
     "url": "https://github.com/andrew54068"
   },
+  "description": "Claude Code plugins by Dawson: permission setup, browser MCP selection, security scanning, skills management, Ralph Loop prompts, open-source prep, and conversation previews.",
   "plugins": [
     {
       "name": "permission-guardian",
@@ -15,13 +16,13 @@
       "name": "browser-mcp-selector",
       "source": "./browser-mcp-selector",
       "description": "Selects the best browser MCP tool for a given task based on requirements like cross-browser support, debugging depth, performance analysis, and login state needs.",
-      "version": "0.1.0"
+      "version": "1.0.0"
     },
     {
       "name": "security-scan",
       "source": "./security-scan",
       "description": "Comprehensive 6-agent parallel security scanner for Claude Code. Detects malicious code, credential leaks, data exfiltration, supply chain risks, and prompt injection attacks.",
-      "version": "0.1.0"
+      "version": "1.0.0"
     },
     {
       "name": "skills-manager",
