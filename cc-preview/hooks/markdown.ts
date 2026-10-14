@@ -601,7 +601,7 @@ function trimRuns(runs: Inline[]): Inline[] {
 
 // ── The file ─────────────────────────────────────────────────────────────────
 
-/** A file's text as a Markdown element may hold it: tab and newline its only control characters. */
+/** A file's text with tab and newline its only control characters, as the terminal draws it. */
 function clean(text: string): string {
   return text.replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, '')
 }
