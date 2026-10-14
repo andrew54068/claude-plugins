@@ -1,7 +1,7 @@
 {
   "name": "cc-preview",
-  "description": "Preview images and markdown files from the conversation and the prompt: hover cards, and a side pane to browse them",
-  "version": "0.3.0",
+  "description": "Preview images and markdown files from the conversation and the prompt: hover cards, and a side pane that draws markdown as a preview does (tables, tasks, alerts, math, pictures)",
+  "version": "0.4.0",
   "author": {
     "name": "dawson wang"
   },

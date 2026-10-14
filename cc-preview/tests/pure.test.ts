@@ -5,7 +5,6 @@ import { clientTerminals, drawsGraphics, parseInputTimes, parseProcesses, pathOf
 import { scan } from '../hooks/conversation'
 import { pickLocale } from '../hooks/i18n'
 import { buttonOffsets, cellWidth, fitLabel, keepCenter, zoomLevels, zoomed } from '../hooks/layout'
-import { markdownChunks } from '../hooks/markdown'
 import { cleanPath, folderOf, pathsIn, resolvePath } from '../hooks/paths'
 
 describe('paths', () => {
@@ -37,33 +36,6 @@ describe('paths', () => {
     expect(folderOf('/work/plan.md', '/work', '/home/me')).toBe('./')
     expect(folderOf('/home/me/Desktop/a.png', '/work', '/home/me')).toBe('~/Desktop/')
     expect(folderOf('/tmp/a.png', '/work', '/home/me')).toBe('/tmp/')
-  })
-})
-
-describe('markdown', () => {
-  test('a short file is one piece, front matter shown as YAML', () => {
-    const { chunks, isTruncated } = markdownChunks('---\ntitle: x\n---\n# Hi\r\nbody\u0007')
-    expect(chunks).toEqual(['```yaml\ntitle: x\n```\n# Hi\nbody'])
-    expect(isTruncated).toBe(false)
-  })
-
-  test('a long file is cut between lines, a fence closed and reopened across the cut', () => {
-    const code = Array.from({ length: 60 }, (_, i) => `line ${i} ${'x'.repeat(20)}`).join('\n')
-    const { chunks } = markdownChunks(`# Title\n\n\`\`\`ts\n${code}\n\`\`\`\n\nafter`, 500)
-    expect(chunks.length).toBeGreaterThan(2)
-    for (const chunk of chunks) expect(chunk.length).toBeLessThan(10_000)
-    for (const chunk of chunks.slice(1, -1)) {
-      expect(chunk.startsWith('```ts')).toBe(true)
-      expect(chunk.endsWith('```')).toBe(true)
-    }
-    expect(chunks.at(-1)?.endsWith('after')).toBe(true)
-  })
-
-  test('stops after the piece limit and says so', () => {
-    const text = Array.from({ length: 200 }, (_, i) => `paragraph ${i} ${'y'.repeat(80)}\n`).join('\n')
-    const { chunks, isTruncated } = markdownChunks(text, 1_000, 3)
-    expect(chunks.length).toBe(3)
-    expect(isTruncated).toBe(true)
   })
 })
 

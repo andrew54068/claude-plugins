@@ -55,8 +55,15 @@ const seen = (): Seen => ({ opened: [], ran: [], toasts: [] })
 
 // A machine with a plan, a chart and one cached paste on disk, a conversation that names them,
 // and a sips that writes what it is asked for; `ran` records each command's first word
-function machine(on: On, was: Seen, draft = { text: '' }, isPlaced = true, screen: Screen = { via: 'local', env: { TERM_PROGRAM: 'ghostty' } }) {
-  const files: Record<string, string> = { [PLAN]: '# Plan\n\nShip it.', [CHART]: CHART_PNG, [`${PASTES}/1.png`]: PASTED_PNG }
+function machine(
+  on: On,
+  was: Seen,
+  draft = { text: '' },
+  isPlaced = true,
+  screen: Screen = { via: 'local', env: { TERM_PROGRAM: 'ghostty' } },
+  more: Record<string, string> = {},
+) {
+  const files: Record<string, string> = { [PLAN]: '# Plan\n\nShip it.', [CHART]: CHART_PNG, [`${PASTES}/1.png`]: PASTED_PNG, ...more }
   const entry = { size: 0, mtimeMs: 0, isLink: false }
   on('session.start', () => ({ cwd: '/work' }))
   on('session.id', () => ({ value: 'sess-1' }))
@@ -178,8 +185,10 @@ test('a reply naming files gets a button each, a hover card each, and a press sh
   expect(await row.find({ type: 'Text', text: 'engine row' })).toBeDefined()
   const buttons = (await row.findAll({ type: 'Button' })).filter(button => button.key?.startsWith('cc-preview:open:'))
   expect(buttons.map(button => button.props.label)).toEqual(['≡ plan.md', '▣ chart.png'])
-  // Hover cards: the plan's first lines, and the chart sent small
-  expect((await row.find({ type: 'Markdown' }))?.props.text).toBe('# Plan\n\nShip it.')
+  // Hover cards: the plan's first lines, drawn, and the chart sent small
+  expect(await row.find({ type: 'Text', text: 'Plan' })).toBeDefined()
+  expect(await row.find({ type: 'Text', text: 'Ship it.' })).toBeDefined()
+  expect(await row.find({ type: 'Markdown' })).toBeUndefined()
   const thumb = await row.find({ type: 'Image', key: 'cc-preview:card:1' })
   expect(thumb?.props.source).toEqual({ png: pngBytes(512, 256) })
   expect([thumb?.props.columns, thumb?.props.rows]).toEqual([32, 8])
@@ -187,7 +196,7 @@ test('a reply naming files gets a button each, a hover card each, and a press sh
   await row.press({ key: 'cc-preview:open:0' })
   expect(was.opened).toEqual(['cc-preview'])
   const pane = await $.ui.mount({ ...PANE, surface: 'terminal' })
-  expect((await pane.find({ type: 'Markdown' }))?.props.text).toBe('# Plan\n\nShip it.')
+  expect(await pane.find({ type: 'Text', text: 'Ship it.' })).toBeDefined()
   expect(await pane.find({ type: 'Text', text: 'docs/' })).toBeDefined()
 
   await row.press({ key: 'cc-preview:zoom:1' })
@@ -244,7 +253,7 @@ test('/preview lists every artifact, newest first, and pages through them', asyn
   expect((await pane.find({ type: 'Image' }))?.props.source).toEqual({ png: PASTED_PNG })
   expect(await pane.find({ type: 'Text', text: '2/3' })).toBeDefined()
   await pane.press({ key: 'cc-preview:next' })
-  expect(await pane.find({ type: 'Markdown' })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: 'Ship it.' })).toBeDefined()
   await pane.press({ key: 'cc-preview:next' })
   expect(await pane.find({ type: 'Text', text: '1/3' })).toBeDefined()
   await pane.press({ key: 'cc-preview:all' })
@@ -253,6 +262,43 @@ test('/preview lists every artifact, newest first, and pages through them', asyn
 
   const missing = await $.command.run({ command: 'preview', args: 'nope.md', ...RUN })
   expect(missing.text).toContain('Nothing to preview at nope.md')
+})
+
+test('a markdown file draws as a preview does: tables as grids, its pictures, a long one in pages', async ($, on) => {
+  const was = seen()
+  mock.clock(on)
+  const guide = '/work/docs/guide.md'
+  const long = '/work/docs/long.md'
+  machine(on, was, { text: '' }, true, undefined, {
+    [guide]: '# Guide\n\n| Name | Score |\n| --- | --: |\n| Al | 9 |\n\n![the chart](../out/chart.png)\n\n- [x] done\n\n> [!NOTE]\n> Mind it.',
+    [long]: Array.from({ length: 2_500 }, (_, i) => `## Part ${i}\n\n${'words '.repeat(12)}`).join('\n\n'),
+  })
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+
+  await $.command.run({ command: 'preview', args: guide, ...RUN })
+  const pane = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await pane.find({ type: 'Markdown' })).toBeUndefined()
+  for (const line of ['┌──────┬───────┐', '│ Name │ Score │', '│ Al   │     9 │', '└──────┴───────┘']) {
+    expect(await pane.find({ type: 'Text', text: line })).toBeDefined()
+  }
+  // The picture beside the file, sent as bytes
+  const picture = await pane.find({ type: 'Image' })
+  expect(picture?.props.source).toEqual({ png: CHART_PNG })
+  expect([picture?.props.columns, picture?.props.rows]).toEqual([80, 20])
+  expect(await pane.find({ type: 'Text', text: '☑' })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: 'ⓘ Note' })).toBeDefined()
+  await pane.unmount()
+
+  await $.command.run({ command: 'preview', args: long, ...RUN })
+  const paged = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await paged.find({ type: 'Text', text: /^page 1\/\d+$/ })).toBeDefined()
+  expect(await paged.find({ type: 'Text', text: 'Part 0' })).toBeDefined()
+  await paged.press({ key: 'cc-preview:page-on' })
+  expect(await paged.find({ type: 'Text', text: /^page 2\/\d+$/ })).toBeDefined()
+  expect(await paged.find({ type: 'Text', text: 'Part 0' })).toBeUndefined()
+  await paged.press({ key: 'cc-preview:page-back' })
+  expect(await paged.find({ type: 'Text', text: 'Part 0' })).toBeDefined()
+  await paged.unmount()
 })
 
 test('a pane the surface cannot seat says why', async ($, on) => {

@@ -11,10 +11,16 @@ the transcript, thumbnails above the prompt, and a side pane to read or browse t
   (`.png .jpg .jpeg .gif .webp`) or a markdown file (`.md .markdown .mdx`) that exists gets a
   button per file (`▣ chart.png`, `≡ plan.md`). Hover for the picture or the file's first lines;
   click to open it in the pane. A tool that returns a picture (an MCP screenshot) gets one too.
+- **Markdown as a preview draws it:** a file is read with markdown-it, the parser VS Code's
+  preview uses, and drawn as it shows: headings, bold, italic, ~~strikethrough~~, links you can
+  click, tables as grids at any width (cells wrap, column names stay whole), lists with ☐ / ☑
+  tasks, quotes and GitHub's `> [!NOTE]` alerts, highlighted code, rules, footnotes, `$math$` in
+  Unicode (`E = mc²`, `∑ᵢ₌₁ⁿ`), raw HTML (`<kbd>`, `<details>`, `<img>`, tables) and the pictures it
+  shows from its folder. A long file is drawn in pages.
 - **Browse everything:** `/preview` lists every artifact in the conversation, images first, newest
   first. In the pane: `1`–`9` pick, `p` / `n` page, `a` back to the list, `c` copies the path,
   `g` switches graphics and blocks, `i` / `o` zoom and `h` `j` `k` `l` move (blocks, docked),
-  `r` refreshes, `Esc` closes. `/preview <path>` opens one file.
+  `b` / `f` turn a long file's pages, `r` refreshes, `Esc` closes. `/preview <path>` opens one file.
 
 Hover and click need a mouse, which Claude Code has in its fullscreen layout (`"tui": "fullscreen"`).
 The pane docks beside the transcript from 110 columns; narrower (a split terminal), it opens above
@@ -81,7 +87,9 @@ permission checks; nothing is written when a check fails, and nothing is deleted
 ## What it reads and runs
 
 - Files the conversation names, only with the extensions above: stat to show a button, read for a
-  hover card or the pane (markdown up to 4 MiB, drawn in pieces of 9000 characters, at most 40).
+  hover card or the pane (markdown up to 4 MiB, drawn in pages of at most 60,000 characters, as a
+  pane holds 100,000), and the pictures a markdown file shows from its folder. A picture's web
+  address is never fetched: it is named instead (`▣ build`).
 - The conversation through `$.session.messages`, when the list opens, after each turn while it is
   open, and once for a resumed conversation's pasted images; a sent prompt's images as it is stored.
 - The draft every 200 ms, and the paste cache `<temp dir>/<project>/<session>/images/`.
@@ -111,3 +119,7 @@ The paste-cache lookup, converters, private-folder check, hover cards, thumbnail
 language picking are adapted from
 [GGGODLIN/cc-mod-image-view](https://github.com/GGGODLIN/cc-mod-image-view) and
 [jarrodwatts/claude-image-view](https://github.com/jarrodwatts/claude-image-view), MIT. See NOTICE.
+
+Markdown is read with [markdown-it](https://github.com/markdown-it/markdown-it) and
+[markdown-it-footnote](https://github.com/markdown-it/markdown-it-footnote), MIT, bundled in
+`hooks/vendor/` with what they import; their licenses are in `hooks/vendor/LICENSES.txt`.

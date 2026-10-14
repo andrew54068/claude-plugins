@@ -19,6 +19,9 @@ export type PictureMode = 'graphics' | 'blocks'
 /** Where the docked pane's block picture is zoomed and moved to, for the artifact `id`. */
 export type ZoomView = { id: string; level: number; x: number; y: number }
 
+/** Which page of the markdown file `id` the pane shows, from 0. */
+export type PageView = { id: string; index: number }
+
 /** An image the prompt being typed refers to (`[Image #n]`) and its cached paste; null when none is found. */
 export type DraftImage = { n: number; path: string | null }
 
@@ -37,6 +40,8 @@ declare module 'claude-code' {
       link: string
       /** The docked pane's zoom: the level, and the window's top left in cells. */
       zoom: ZoomView
+      /** The page of a long markdown file the pane shows. */
+      page: PageView
     }
   }
 }

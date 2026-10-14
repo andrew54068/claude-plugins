@@ -1,13 +1,15 @@
 import { atom, read, update } from 'claude-code'
 import type { Elements, EngineInterface, PluginOptions, Register, RenderElement, RenderViewport } from 'claude-code'
 
-import type { Artifact, DraftImage, PictureMode, ZoomView } from '../types'
+import type { Artifact, DraftImage, PageView, PictureMode, ZoomView } from '../types'
 import { parseBmp, quadrants } from './blocks'
 import type { Pixels } from './blocks'
 import { clientTerminals, drawsGraphics, parseInputTimes, parseProcesses, pathLabel, pathOf } from './connection'
 import type { Path, TerminalEnv } from './connection'
 import { imagesIn, promptImages, scan, shortTool, toolPaths } from './conversation'
 import type { Block, Message, Picture, PromptImages, Words } from './conversation'
+import { drawDocument, paginate, pictureKey } from './document'
+import type { Drawing, PictureAsk } from './document'
 import { pickLocale, stringsFor } from './i18n'
 import type { Strings } from './i18n'
 import {
@@ -25,8 +27,8 @@ import {
   zoomed,
 } from './layout'
 import type { Cells, Size, Zoomed } from './layout'
-import { markdownChunks } from './markdown'
-import type { Chunked } from './markdown'
+import { markdownHead, parseMarkdown } from './markdown'
+import type { Block as MarkdownBlock } from './markdown'
 import {
   BMP_CONVERTERS,
   CONVERTERS,
@@ -61,6 +63,8 @@ const CARD_BOX: Record<PictureMode, { rows: number; columns: number }> = { graph
 // A markdown file's hover card shows its first lines
 const CARD_LINES = 14
 const CARD_CHARS = 1_200
+// A picture in a markdown file is sent at most this long on its longest side
+const DOC_EDGE = 1_024
 // A button's widest label; a longer file name loses its middle
 const LABEL_CELLS = 28
 
@@ -70,6 +74,7 @@ const draft = atom({ plugin: 'cc-preview', key: 'draft' } as const, [] as DraftI
 const mode = atom({ plugin: 'cc-preview', key: 'mode' } as const, 'blocks' as PictureMode)
 const link = atom({ plugin: 'cc-preview', key: 'link' } as const, '')
 const zoom = atom({ plugin: 'cc-preview', key: 'zoom' } as const, { id: '', level: 0, x: 0, y: 0 } as ZoomView)
+const page = atom({ plugin: 'cc-preview', key: 'page' } as const, { id: '', index: 0 } as PageView)
 
 type Terminal = Elements['terminal']
 type Place = { cwd: string; root: string; home: string | undefined }
@@ -495,29 +500,87 @@ async function drawPicture(
 
 // ── Documents ────────────────────────────────────────────────────────────────
 
-const documents = memo<Chunked>(4)
+/** A markdown file read, under the key of its version. */
+type Doc = { key: string; blocks: MarkdownBlock[] }
 
-/** A markdown file as Markdown pieces, or why it can't be shown. */
-async function documentOf($: EngineInterface, path: string): Promise<Chunked | string> {
+/** Which version of a markdown file is on disk, or why it can't be shown. */
+async function versionOf($: EngineInterface, path: string): Promise<{ key: string } | string> {
   const stat = await $.fs.stat(path).catch(() => null)
   if (stat?.kind !== 'file') return strings.documentGone
   if (stat.size > MAX_MARKDOWN_BYTES) return strings.documentTooBig
-  const chunked = await documents(`${path}|${stat.mtimeMs}|${stat.size}`, async () => {
-    const text = await $.fs.read(path).catch(() => null)
-    return text === null ? null : markdownChunks(text)
-  })
-  return chunked ?? strings.documentUnreadable
+  return { key: `${path}|${stat.mtimeMs}|${stat.size}` }
 }
 
-/** A markdown file's first lines, for its hover card. */
-async function documentHead($: EngineInterface, path: string): Promise<string | null> {
-  const document = await documentOf($, path)
-  const first = typeof document === 'string' ? undefined : document.chunks[0]
-  if (first === undefined) return null
-  const lines = first.split('\n')
-  const head = lines.slice(0, CARD_LINES).join('\n').slice(0, CARD_CHARS)
-  const isCut = lines.length > CARD_LINES || head.length < first.length
-  return markdownChunks(isCut ? `${head}\n\n…` : head, CARD_CHARS + 200, 1).chunks[0] ?? null
+const documents = memo<Doc>(4)
+
+/** A markdown file as blocks, or why it can't be shown. */
+async function documentOf($: EngineInterface, path: string): Promise<Doc | string> {
+  const version = await versionOf($, path)
+  if (typeof version === 'string') return version
+  const { key } = version
+  const document = await documents(key, async () => {
+    const text = await $.fs.read(path).catch(() => null)
+    return text === null ? null : { key, blocks: parseMarkdown(text) }
+  })
+  return document ?? strings.documentUnreadable
+}
+
+// Every row naming a file draws its card: only the first lines are read into blocks, for many files
+const heads = memo<MarkdownBlock[]>(64)
+
+/** A markdown file's first lines as blocks, for its hover card. */
+async function documentHead($: EngineInterface, path: string): Promise<MarkdownBlock[] | null> {
+  const version = await versionOf($, path)
+  if (typeof version === 'string') return null
+  return heads(version.key, async () => {
+    const text = await $.fs.read(path).catch(() => null)
+    return text === null ? null : markdownHead(text, CARD_LINES, CARD_CHARS)
+  })
+}
+
+const layouts = memo<MarkdownBlock[][]>(8)
+
+/** A file's pages, each under the bounds of a tree, at `columns` cells wide. */
+function pagesOf(document: Doc, columns: number): Promise<MarkdownBlock[][] | null> {
+  return layouts(`${document.key}|${columns}`, async () => paginate(document.blocks, columns))
+}
+
+const folderOfFile = (path: string) => path.slice(0, path.lastIndexOf('/')) || '/'
+
+/**
+ * A picture a markdown file shows (`![alt](src)`), from a path relative to the file's folder: no
+ * bigger than it is (a cell taken as 8 × 16 pixels) or than `rows`. Null for a web address, which
+ * is never fetched, and for what isn't a picture file.
+ */
+async function documentPicture(
+  $: EngineInterface,
+  ui: Terminal,
+  folder: string,
+  ask: PictureAsk,
+  look: { mode: PictureMode; rows: number; key: string },
+): Promise<RenderElement | null> {
+  const raw = ask.src.trim()
+  if (raw === '' || (/^[a-z][a-z0-9+.-]*:/i.test(raw) && !/^file:\/\//i.test(raw))) return null
+  let written = raw.replace(/^file:\/\//i, '').replace(/[?#].*$/, '')
+  try {
+    written = decodeURI(written)
+  } catch {
+    // keep it as written
+  }
+  const path = resolvePath(written, folder, (await placeOf($)).home)
+  if (path === null || kindOf(path) !== 'image') return null
+  const artifact: Artifact = { id: `file:${path}`, kind: 'image', label: basename(path), detail: '', source: { type: 'file', path } }
+  const master = await masterOf($, artifact)
+  if (master === null) return null
+  const cells = fitBox(master.size, Math.min(ask.columns, Math.ceil(master.size.width / 8)), Math.min(look.rows, Math.ceil(master.size.height / 16)))
+  return drawPicture($, ui, master, cells, { mode: look.mode, edge: DOC_EDGE, key: look.key, alt: artifact.label })
+}
+
+/** Turns the pane's document `delta` pages on, and goes to the top of the page. */
+function turnPage($: EngineInterface, id: string, delta: number, count: number) {
+  void update($, page, view => ({ id, index: clamp((view.id === id ? view.index : 0) + delta, 0, count - 1) }))
+    .then(() => $.ui.scroll({ in: PANE, to: 'start' }))
+    .catch(() => undefined)
 }
 
 // ── The pane ─────────────────────────────────────────────────────────────────
@@ -608,7 +671,7 @@ type Card = { node: RenderElement; width: number }
 
 /** What hovering a button shows: the picture, or a markdown file's first lines; and a button to open it in the pane. */
 async function cardOf($: EngineInterface, ui: Terminal, site: Site, artifact: Artifact, at: number, room: number): Promise<Card | null> {
-  const { Box, Button, Markdown } = ui
+  const { Box, Button } = ui
   const zoom = (
     <Button
       key={`cc-preview:zoom:${at}`}
@@ -619,13 +682,13 @@ async function cardOf($: EngineInterface, ui: Terminal, site: Site, artifact: Ar
   )
   if (artifact.kind === 'markdown') {
     const head = artifact.source.type === 'file' ? await documentHead($, artifact.source.path) : null
-    if (head === null) return null
+    if (head === null || head.length === 0) return null
     const width = Math.min(72, room)
     return {
       width,
       node: (
         <Box width={width} flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
-          <Markdown text={head} />
+          {drawDocument(head, width - 4, { ui, alerts: strings.alerts })}
           {zoom}
         </Box>
       ),
@@ -1008,7 +1071,7 @@ export const register: Register = (on, options) => {
       return <Text dimColor>{strings.terminalOnly}</Text>
     }
     const ui = $.ui.resolve(e)
-    const { Box, Button, Markdown, Text } = ui
+    const { Box, Button, Text } = ui
     const list = await read($, artifacts)
     const current = await read($, selected)
     const look = await read($, mode)
@@ -1164,16 +1227,54 @@ export const register: Register = (on, options) => {
     }
 
     const document = path === null ? strings.documentGone : await documentOf($, path)
+    const pages = typeof document === 'string' ? null : await pagesOf(document, columns)
+    if (path === null || typeof document === 'string' || pages === null) {
+      return (
+        <Box flexDirection="column">
+          {header}
+          {title}
+          <Text dimColor>{typeof document === 'string' ? document : strings.documentUnreadable}</Text>
+        </Box>
+      )
+    }
+    const saved = await read($, page)
+    const index = saved.id === current.id ? clamp(saved.index, 0, pages.length - 1) : 0
+    const blocks = pages[index] ?? []
+    const folder = folderOfFile(path)
+    // Drawn once to learn which pictures the page shows, and again with them
+    const asks: PictureAsk[] = []
+    const drawing: Drawing = { ui, alerts: strings.alerts, folder }
+    let body = drawDocument(blocks, columns, { ...drawing, asks, pictures: new Map() })
+    if (asks.length > 0) {
+      const pictures = new Map<string, RenderElement | null>()
+      const pictureRows = Math.max(6, Math.floor(rows * 0.75))
+      for (const [i, ask] of asks.entries()) {
+        pictures.set(pictureKey(ask), await documentPicture($, ui, folder, ask, { mode: look, rows: pictureRows, key: `cc-preview:doc:${i}` }))
+      }
+      body = drawDocument(blocks, columns, { ...drawing, pictures })
+    }
+    note($, `pane document page ${index + 1}/${pages.length}, ${blocks.length} blocks, ${asks.length} pictures`)
+    const turn = (delta: number) => () => turnPage($, current.id, delta, pages.length)
+    const paging = pages.length > 1 && (
+      <Box flexDirection="row" columnGap={1}>
+        {index > 0 && <Button key="cc-preview:page-back" label={strings.pageBack} hotkey="b" dimColor onPress={turn(-1)} />}
+        <Text dimColor>{strings.page(index + 1, pages.length)}</Text>
+        {index < pages.length - 1 && <Button key="cc-preview:page-on" label={strings.pageOn} hotkey="f" dimColor onPress={turn(1)} />}
+      </Box>
+    )
     return (
       <Box flexDirection="column">
         {header}
-        {title}
-        {typeof document === 'string' ? (
-          <Text dimColor>{document}</Text>
-        ) : (
-          document.chunks.map((text, i) => <Markdown key={`cc-preview:md:${i}`} text={text} />)
+        <Box flexDirection="row" flexWrap="wrap" columnGap={2}>
+          {title}
+          {paging}
+        </Box>
+        {body}
+        {index < pages.length - 1 && (
+          <Box marginTop={1}>
+            <Button key="cc-preview:page-next" label={strings.pageNext(index + 2, pages.length)} dimColor onPress={turn(1)} />
+          </Box>
         )}
-        {typeof document !== 'string' && document.isTruncated && <Text dimColor>{strings.truncated}</Text>}
       </Box>
     )
   }).catch(($, e, next) => {

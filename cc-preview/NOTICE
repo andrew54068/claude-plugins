@@ -10,3 +10,8 @@ https://github.com/jarrodwatts/claude-image-view/tree/12795b62f1c17f4b36c980e336
 Original work Copyright (c) 2026 Jarrod Watts, licensed under the MIT License.
 See LICENSE. The plugin id here is cc-preview so it does not share either
 upstream plugin name.
+
+hooks/vendor/markdown-it.js bundles markdown-it 15.0.2 and markdown-it-footnote 4.0.0
+(Copyright (c) 2014 Vitaly Puzrin, Alex Kocharin; MIT) with entities 8.1.0 (BSD-2-Clause),
+linkify-it 6.1.0, mdurl 2.1.0, punycode.js 2.3.1 and uc.micro 3.0.0 (MIT). Each license is
+in hooks/vendor/LICENSES.txt.
