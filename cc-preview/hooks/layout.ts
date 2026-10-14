@@ -85,13 +85,18 @@ export function fitRow(
   return sizes.map(size => fitCells(size, 1))
 }
 
-// East Asian wide and fullwidth ranges a label may use; everything else here is one cell.
-const WIDE = /[\u1100-\u115f\u2e80-\u303e\u3041-\u33ff\u3400-\u4dbf\u4e00-\u9fff\ua000-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6]/
+// East Asian wide and fullwidth characters, and emoji drawn as pictures: two cells each
+const WIDE = /[\u1100-\u115f\u2e80-\u303e\u3041-\u33ff\u3400-\u4dbf\u4e00-\u9fff\ua000-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6\u{20000}-\u{3fffd}\p{Emoji_Presentation}]/u
+// Combining marks, zero-width spaces and joiners, variation selectors: no cell of their own
+const ZERO = /[\p{Mn}\p{Me}\u200b-\u200f\u2060\ufe00-\ufe0f]/u
+
+/** Whether a character takes two cells. */
+export const isWide = (char: string) => WIDE.test(char)
 
 /** Terminal cells a string takes. */
 export function cellWidth(text: string): number {
   let width = 0
-  for (const char of text) width += WIDE.test(char) ? 2 : 1
+  for (const char of text) width += ZERO.test(char) ? 0 : WIDE.test(char) ? 2 : 1
   return width
 }
 

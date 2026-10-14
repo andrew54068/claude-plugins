@@ -1,4 +1,6 @@
 // Adapted from cc-image-view (https://github.com/GGGODLIN/cc-mod-image-view), MIT; see NOTICE.
+import type { Alert } from './markdown'
+
 export type Locale = 'en' | 'zh-TW'
 
 export type Strings = {
@@ -26,7 +28,11 @@ export type Strings = {
   documentGone: string
   documentTooBig: string
   documentUnreadable: string
-  truncated: string
+  alerts: Record<Alert, string>
+  page: (n: number, total: number) => string
+  pageBack: string
+  pageOn: string
+  pageNext: (n: number, total: number) => string
   notPlaced: (reason: string) => string
   notFound: (path: string) => string
   terminalOnly: string
@@ -61,7 +67,11 @@ const STRINGS: Record<Locale, Strings> = {
     documentGone: 'This file is gone.',
     documentTooBig: 'This file is over 4 MiB, too big to show here.',
     documentUnreadable: 'This file could not be read.',
-    truncated: '… the rest of this file is not shown.',
+    alerts: { note: 'Note', tip: 'Tip', important: 'Important', warning: 'Warning', caution: 'Caution' },
+    page: (n, total) => `page ${n}/${total}`,
+    pageBack: '‹ Page',
+    pageOn: 'Page ›',
+    pageNext: (n, total) => `Page ${n}/${total} ›`,
     notPlaced: reason => `Preview pane is waiting for room: ${reason}`,
     notFound: path => `Nothing to preview at ${path}: no image or markdown file there.`,
     terminalOnly: 'The preview pane draws in the terminal.',
@@ -95,7 +105,11 @@ const STRINGS: Record<Locale, Strings> = {
     documentGone: '檔案已不在。',
     documentTooBig: '檔案超過 4 MiB，太大無法在這裡顯示。',
     documentUnreadable: '無法讀取這個檔案。',
-    truncated: '…其餘內容未顯示。',
+    alerts: { note: '注意', tip: '提示', important: '重要', warning: '警告', caution: '小心' },
+    page: (n, total) => `第 ${n}/${total} 頁`,
+    pageBack: '‹ 上一頁',
+    pageOn: '下一頁 ›',
+    pageNext: (n, total) => `第 ${n}/${total} 頁 ›`,
     notPlaced: reason => `預覽窗格等待空間：${reason}`,
     notFound: path => `${path} 沒有可預覽的圖片或 Markdown 檔案。`,
     terminalOnly: '預覽窗格只在終端機中顯示。',

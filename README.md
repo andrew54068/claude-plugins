@@ -12,7 +12,7 @@ A collection of Claude Code plugins. Each plugin can be installed independently.
 | [skills-manager](./skills-manager) | Manage per-project skills, plugins, and MCP servers via a bullpen + symlink pattern (Claude + Codex) |
 | [ralph-expert](./ralph-expert) | Turn a vague task into a well-structured Ralph Loop prompt with completion criteria and a max-iteration safety net (requires the `ralph-loop` plugin) |
 | [open-source-prep](./open-source-prep) | Prepare a private codebase for safe open-source release with secret scanning, license guidance, and standard repository documentation |
-| [cc-preview](./cc-preview) | 在 Claude Code 預覽對話裡的圖片與 Markdown：滑鼠移上去看預覽、送出前的貼圖縮圖、側邊面板；ssh 顯示真實像素，mosh 用方塊字元畫圖 |
+| [cc-preview](./cc-preview) | 在 Claude Code 預覽對話裡的圖片與 Markdown：滑鼠移上去看預覽、送出前的貼圖縮圖、側邊面板（Markdown 照 VS Code 預覽的方式畫出表格、待辦清單、提示框、數學式與圖片）；ssh 顯示真實像素，mosh 用方塊字元畫圖 |
 
 ## Install
 
