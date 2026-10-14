@@ -69,6 +69,11 @@ describe('reading markdown', () => {
     expect(quote?.type === 'quote' && quote.alert).toBeNull()
   })
 
+  test('a CJK title ends at its line, the body stays in the callout', () => {
+    const [tip] = parseMarkdown('> [!tip] 提示\n> 這是內容')
+    expect(tip?.type === 'quote' && [tip.alert, plain(tip.title ?? []), plain(only(tip.blocks, 'paragraph').content)]).toEqual(['tip', '提示', '這是內容'])
+  })
+
   test('footnotes are numbered, and listed at the end', () => {
     const blocks = parseMarkdown('A claim[^src] and another[^b].\n\n[^src]: The source.\n[^b]: Second.')
     expect(plain(only(blocks, 'paragraph').content)).toBe('A claim[1] and another[2].')

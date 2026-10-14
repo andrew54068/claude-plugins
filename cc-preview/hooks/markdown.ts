@@ -234,7 +234,7 @@ class Runs {
       const next = after?.type === 'text' ? [...after.text][0] : undefined
       if (soft?.type === 'text' && last !== undefined && next !== undefined && isWide(last) && isWide(next)) this.out[at] = { ...soft, text: '' }
     }
-    return this.out.filter(item => item.type !== 'text' || item.text !== '')
+    return this.out.filter(item => item.type !== 'text' || item.text !== '' || item.isSoft === true)
   }
 }
 
