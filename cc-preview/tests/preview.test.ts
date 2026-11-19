@@ -44,14 +44,10 @@ const CHART_PNG = pngBytes(800, 400)
 const PASTED_PNG = pngBytes(300, 300)
 const base64Bytes = (base64: string) => Math.floor((base64.length * 3) / 4)
 
-type Seen = { opened: string[]; ran: string[]; toasts: string[] }
+type Seen = { opened: string[]; ran: string[]; toasts: string[]; listed: string[]; promptReads: number }
 type Screen = { via: 'mosh' | 'ssh' | 'local'; env: Record<string, string>; isCommandRefused?: boolean }
 
-// The process above this one that the path to the screen ends at
-const TOPS = { mosh: 'mosh-server', ssh: 'sshd-session: me@ttys001', local: '/Applications/Ghostty.app/Contents/MacOS/ghostty' }
-const processTable = (via: Screen['via']) =>
-  `100\n  100    90 ttys001  claude\n   90    80 ttys001  -zsh\n   80     1 ??       ${TOPS[via]}\n`
-const seen = (): Seen => ({ opened: [], ran: [], toasts: [] })
+const seen = (): Seen => ({ opened: [], ran: [], toasts: [], listed: [], promptReads: 0 })
 
 // A machine with a plan, a chart and one cached paste on disk, a conversation that names them,
 // and a sips that writes what it is asked for; `ran` records each command's first word
@@ -66,11 +62,15 @@ function machine(
   const files: Record<string, string> = { [PLAN]: '# Plan\n\nShip it.', [CHART]: CHART_PNG, [`${PASTES}/1.png`]: PASTED_PNG, ...more }
   const entry = { size: 0, mtimeMs: 0, isLink: false }
   on('session.start', () => ({ cwd: '/work' }))
+  on('session.end', ($, e) => ({ sessionId: e.sessionId }))
   on('session.id', () => ({ value: 'sess-1' }))
   on('session.cwd', () => ({ value: '/work' }))
   on('session.root', () => ({ value: '/work' }))
   on('env.get', ($, e) => ({ value: { CLAUDE_CODE_TMPDIR: '/tmp/claude-501', HOME: '/home/me', ...screen.env }[e.name] }))
-  on('prompt.read', () => ({ value: { text: draft.text, cursor: draft.text.length } }))
+  on('prompt.read', () => {
+    was.promptReads++
+    return { value: { text: draft.text, cursor: draft.text.length } }
+  })
   on('fs.stat', ($, e) => {
     const body = files[e.path]
     if (body === undefined) throw new Error(`ENOENT: ${e.path}`)
@@ -83,9 +83,10 @@ function machine(
     return { value: e.as === 'bytes' ? { base64: body } : body }
   })
   on('fs.exists', ($, e) => ({ value: e.path === PASTES || files[e.path] !== undefined }))
-  on('fs.list', ($, e) => ({
-    value: e.path === PASTES ? [{ name: '1.png', kind: 'file', ...entry }] : [{ name: '-work', kind: 'dir', ...entry }],
-  }))
+  on('fs.list', ($, e) => {
+    was.listed.push(e.path ?? '')
+    return { value: e.path === PASTES ? [{ name: '1.png', kind: 'file', ...entry }] : [{ name: '-work', kind: 'dir', ...entry }] }
+  })
   on('process.run', ($, e) => {
     const argv = e.argv.map(String)
     const script = argv[0] === 'sh' ? (argv[2] ?? '') : ''
@@ -94,7 +95,6 @@ function machine(
     let stdout = ''
     if (script.startsWith('head')) stdout = (files[argv[4] ?? ''] ?? '').slice(0, 44)
     else if (script.includes('base64 -d')) files[argv[4] ?? ''] = String(e.init?.stdin ?? '')
-    else if (script.includes('ps -axo')) stdout = processTable(screen.via)
     else if (argv[0] === 'mv') {
       files[argv[3] ?? ''] = files[argv[2] ?? ''] ?? ''
       delete files[argv[2] ?? '']
@@ -344,7 +344,11 @@ test('the draft shows its pasted images above the prompt, each one press from th
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
 
   draft.text = 'like [Image #1] but not [Image #2]'
-  await clock.advance(200)
+  await clock.advance(999)
+  const waiting = await $.ui.mount(band)
+  expect(await waiting.find({ type: 'Image' })).toBeUndefined()
+  await waiting.unmount()
+  await clock.advance(1)
   const shown = await $.ui.mount(band)
   expect((await shown.findAll({ type: 'Image' })).map(image => image.props.source)).toEqual([{ png: PASTED_PNG }])
   expect(await shown.find({ type: 'Text', text: 'no preview' })).toBeDefined()
@@ -408,44 +412,33 @@ test('docked, a block picture zooms toward 100% and moves about; inline it does 
   await row.unmount()
 })
 
-test('pictures are drawn in characters wherever kitty graphics would not reach the screen, and follow a reattach', async ($, on) => {
+test('auto uses environment values; startup, idle time and preview opens never run process detection', { options: { pictures: 'auto' } }, async ($, on) => {
   const was = seen()
   const clock = mock.clock(on)
-  const screen: Screen = { via: 'mosh', env: { CLAUDE_CODE_FORCE_TERMINAL_IMAGES: '1', TERM_PROGRAM: 'herdr' } }
-  machine(on, was, { text: '' }, true, screen)
+  machine(on, was)
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
-
-  // Under mosh: the hover card in characters
-  const moshed = await $.ui.mount(reply('See out/chart.png'))
-  expect(await moshed.find({ type: 'Image' })).toBeUndefined()
-  expect(await moshed.find({ type: 'Raster' })).toBeDefined()
-  await moshed.unmount()
-
-  // Attached again over ssh: graphics within a few seconds
-  screen.via = 'ssh'
-  await clock.advance(5_000)
+  await clock.advance(1_000)
+  const startupRuns = [...was.ran]
+  await clock.advance(30_000)
+  expect(was.ran).toEqual(startupRuns)
+  expect(was.ran.some(command => command === 'sh:echo' || command === 'sh:stat' || command === 'ps' || command === 'ls')).toBe(false)
+  expect(was.listed).toEqual([])
   const row = await $.ui.mount(reply('See out/chart.png'))
   expect(await row.find({ type: 'Image' })).toBeDefined()
   await row.press({ key: 'cc-preview:open:0' })
   const pane = await $.ui.mount({ ...PANE, surface: 'terminal' })
   const label = async () => (await pane.find({ type: 'Button', key: 'cc-preview:mode' }))?.props.label
-  expect(await label()).toBe('▣ Graphics · ssh')
-
-  // A switch in the pane stands while the path does, and gives way when it changes
-  await pane.press({ key: 'cc-preview:mode' })
-  await clock.advance(5_000)
-  expect(await label()).toBe('▦ Blocks · ssh')
-  screen.via = 'mosh'
-  await clock.advance(5_000)
-  expect(await label()).toBe('▦ Blocks · mosh')
-  screen.via = 'local'
-  await clock.advance(5_000)
   expect(await label()).toBe('▣ Graphics · ghostty')
+  await pane.press({ key: 'cc-preview:mode' })
+  await clock.advance(30_000)
+  await $.command.run({ command: 'preview', args: CHART, ...RUN })
+  expect(await label()).toBe('▦ Blocks · ghostty')
+  expect(was.ran.some(command => command === 'sh:echo' || command === 'sh:stat' || command === 'ps' || command === 'ls')).toBe(false)
   await pane.unmount()
   await row.unmount()
 })
 
-test('a terminal Claude Code sends no graphics to gets characters', async ($, on) => {
+test('a terminal Claude Code sends no graphics to gets characters', { options: { pictures: 'auto' } }, async ($, on) => {
   const was = seen()
   mock.clock(on)
   machine(on, was, { text: '' }, true, { via: 'ssh', env: { TERM_PROGRAM: 'Apple_Terminal' } })
@@ -455,14 +448,24 @@ test('a terminal Claude Code sends no graphics to gets characters', async ($, on
   await row.unmount()
 })
 
-test('under mosh, the draft band and a sent prompt draw their pasted images in characters', async ($, on) => {
+test('with the option unset, pictures are kitty graphics even where auto would pick characters', async ($, on) => {
+  const was = seen()
+  mock.clock(on)
+  machine(on, was, { text: '' }, true, { via: 'ssh', env: { TERM_PROGRAM: 'Apple_Terminal' } })
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+  const row = await $.ui.mount(reply('See out/chart.png'))
+  expect(await row.find({ type: 'Raster' })).toBeUndefined()
+  await row.unmount()
+})
+
+test('explicit blocks mode draws pasted images in characters under mosh', { options: { pictures: 'blocks' } }, async ($, on) => {
   const was = seen()
   const draft = { text: '' }
   const clock = mock.clock(on)
   machine(on, was, draft, true, { via: 'mosh', env: { CLAUDE_CODE_FORCE_TERMINAL_IMAGES: '1' } })
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
   draft.text = 'like [Image #1]'
-  await clock.advance(200)
+  await clock.advance(1_000)
   const band = await $.ui.mount({
     plugin: PLUGIN,
     component: 'AbovePrompt',
@@ -479,7 +482,7 @@ test('under mosh, the draft band and a sent prompt draw their pasted images in c
   await sent.unmount()
 })
 
-test('a load session.start never reaches still feeds the band and finds the path, from the first hook that runs', async ($, on) => {
+test('a mid-session load starts polling only when the terminal draft band draws', { options: { pictures: 'blocks' } }, async ($, on) => {
   const was = seen()
   const draft = { text: 'like [Image #1]' }
   const clock = mock.clock(on)
@@ -491,14 +494,14 @@ test('a load session.start never reaches still feeds the band and finds the path
     requestId: 'above-prompt',
     props: { hasSurvey: false, isWorking: false, maxRows: 20, bodyColumns: 120, scroll: { offset: 0, bodyRows: 20 }, view: {} },
   } as const
-  // No session.start: the band's own draw starts the poll and the look at the path
+  // No session.start: the terminal band's own draw starts polling and reads settings.
   const first = await $.ui.mount(band)
   expect(await first.find({ type: 'Raster' })).toBeUndefined()
   await first.unmount()
-  await clock.advance(200)
+  await clock.advance(1_000)
   const later = await $.ui.mount(band)
   expect(await later.find({ type: 'Raster' })).toBeDefined()
-  expect(was.ran.some(command => command === 'sh:echo')).toBe(true)
+  expect(was.ran.some(command => command === 'sh:echo')).toBe(false)
   await later.unmount()
 })
 
@@ -509,7 +512,7 @@ test('a refused /preview leaves the rest running', async ($, on) => {
   machine(on, was, draft, true, { via: 'local', env: { TERM_PROGRAM: 'ghostty' }, isCommandRefused: true })
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
   draft.text = 'like [Image #1]'
-  await clock.advance(200)
+  await clock.advance(1_000)
   const band = await $.ui.mount({
     plugin: PLUGIN,
     component: 'AbovePrompt',
@@ -528,7 +531,7 @@ test('a band squeezed by an inline pane drops borders, then pictures, so the res
   machine(on, was, draft)
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
   draft.text = 'like [Image #1]'
-  await clock.advance(200)
+  await clock.advance(1_000)
   const band = (maxRows: number) =>
     ({
       plugin: PLUGIN,
@@ -552,4 +555,48 @@ test('a band squeezed by an inline pane drops borders, then pictures, so the res
   expect(await sliver.find({ type: 'Image' })).toBeUndefined()
   expect(await sliver.find({ type: 'Button', key: 'cc-preview:draft:1' })).toBeDefined()
   await sliver.unmount()
+})
+
+
+test('missing images stop directory scans after five attempts and a new draft restarts the budget', async ($, on) => {
+  const was = seen()
+  const draft = { text: 'missing [Image #2] and [Image #3]' }
+  const clock = mock.clock(on)
+  machine(on, was, draft)
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+  await clock.advance(5_000)
+  expect(was.listed.filter(path => path === PASTES).length).toBe(5)
+  const listings = was.listed.length
+  await clock.advance(30_000)
+  expect(was.listed.length).toBe(listings)
+  draft.text = ''
+  await clock.advance(1_000)
+  draft.text = 'found [Image #1]'
+  await clock.advance(1_000)
+  expect(was.listed.length).toBe(listings + 1)
+  await clock.advance(10_000)
+  expect(was.listed.length).toBe(listings + 1)
+})
+
+test('headless sessions do not poll the draft or scan image folders', async ($, on) => {
+  const was = seen()
+  const clock = mock.clock(on)
+  machine(on, was, { text: '[Image #1]' })
+  await $.session.start({ surface: null, isInteractive: false, cwd: '/work' })
+  await clock.advance(30_000)
+  expect(was.promptReads).toBe(0)
+  expect(was.listed).toEqual([])
+  expect(was.ran.some(command => command === 'sh:echo' || command === 'sh:stat' || command === 'ps' || command === 'ls')).toBe(false)
+})
+
+test('ending a session cancels draft polling', async ($, on) => {
+  const was = seen()
+  const clock = mock.clock(on)
+  machine(on, was)
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+  await clock.advance(1_000)
+  const reads = was.promptReads
+  await $.session.end({ reason: 'prompt_input_exit', sessionId: 'sess-1', resume: { id: 'sess-1' } })
+  await clock.advance(30_000)
+  expect(was.promptReads).toBe(reads)
 })

@@ -1,7 +1,7 @@
 {
   "name": "cc-preview",
   "description": "Preview images and markdown files from the conversation and the prompt: hover cards, and a side pane that draws markdown as a preview does (tables, tasks, alerts, math, pictures)",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "author": {
     "name": "dawson wang"
   },
@@ -23,8 +23,8 @@
     "pictures": {
       "type": "string",
       "title": "Pictures",
-      "description": "How pictures are drawn. graphics: kitty graphics (kitty, Ghostty, WezTerm). blocks: colored block characters, which every terminal and mosh carry. auto: graphics only where they are known to reach the screen (no mosh on the way, a terminal that draws them), else blocks; looked at again every 5 s.",
-      "default": "auto",
+      "description": "How pictures are drawn. graphics (default): kitty graphics. blocks: colored block characters, which every terminal and mosh carry. auto: choose from TERM_PROGRAM, TERM and CLAUDE_CODE_FORCE_TERMINAL_IMAGES at startup, without process scans. Use blocks for mosh; g switches modes in the pane.",
+      "default": "graphics",
       "options": [
         "auto",
         "graphics",
