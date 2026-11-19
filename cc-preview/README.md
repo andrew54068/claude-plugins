@@ -37,13 +37,13 @@ claude plugin install cc-preview@andrew54068 --scope user
 
 Or for one session from a clone: `claude --plugin-dir /path/to/claude-plugins/cc-preview`.
 
-Needs Claude Code 2.1.289 or later. Markdown draws in any terminal. Pictures draw in kitty
-graphics where Claude Code knows the terminal shows them (Ghostty, kitty, WezTerm, found from
-`TERM_PROGRAM` / `TERM`), and in block characters everywhere else (below), so nothing needs
-setting up to see them.
+Needs Claude Code 2.1.289 or later. Markdown draws in any terminal. Pictures use kitty graphics
+by default. Set `pictures` to `blocks` for mosh or a terminal without kitty graphics. `auto`
+chooses from `TERM_PROGRAM`, `TERM` and `CLAUDE_CODE_FORCE_TERMINAL_IMAGES` at startup; it does
+not inspect processes or detect connection changes.
 
 Herdr passes kitty graphics but reports `TERM=xterm-256color`, so Claude Code can't tell and
-pictures fall back to blocks. For graphics, tell it in `~/.zshrc` or `~/.bashrc` (new panes only):
+Claude Code may not send them. For graphics, tell it in `~/.zshrc` or `~/.bashrc` (new panes only):
 
 ```sh
 if [ -n "$HERDR_ENV" ]; then
@@ -59,23 +59,17 @@ Every picture is sent to the terminal as bytes, never as a file name, so it show
 runs on another machine.
 
 - **ssh:** kitty graphics pass through.
-- **Graphics or characters, found for you.** Pictures use kitty graphics only where they are known
-  to reach the screen; everywhere else they are drawn in quadrant block characters (`▘▝▀▖▌▞▛`,
-  four pixels a cell, 24-bit color), which every terminal and mosh carry. The terminal can't be
-  asked directly (its reply would land in Claude Code's input), so the path to it is read: the
-  processes above Claude Code, and through herdr, tmux, zellij or screen, the client whose
-  terminal had input last. Graphics need all of: Claude Code sending them
-  (`CLAUDE_CODE_FORCE_TERMINAL_IMAGES=1`, or a kitty, Ghostty or WezTerm terminal), no mosh on the
-  path, and a local terminal app that draws them. Looked at again every 5 s, so detaching and
-  attaching over another connection switches within seconds; the pane's mode button names what
-  was found (`▦ Blocks · mosh`, `▣ Graphics · ssh`, `▣ Graphics · ghostty`).
+- **Graphics or characters (`pictures: auto`).** Reads terminal environment values once.
+  No process-table scans, terminal-device checks or connection-detection timer. Environment
+  values can stay unchanged after a multiplexer reconnect; use `g` or `pictures: blocks` if the
+  current connection cannot carry graphics. The pane's mode button shows the terminal value.
 - **mosh** keeps its own copy of the screen and sends only text and colors, so graphics never
   reach the client. Characters are a hard ceiling: a 100-column pane holds 200 pixels across. A
   short pane fills its width and scrolls (↑↓). Docked beside the transcript, the picture zooms:
   `i` / `o` step from the fit up to 100% (each pixel of the picture a pixel of the blocks across),
   and `h` `j` `k` `l` move the window. For the whole picture at full resolution at once, use ssh.
-- The `pictures` option (`/config`) pins the choice: `auto` (default), `graphics` or `blocks`.
-  `g` in the pane switches it until the path changes.
+- The `pictures` option (`/config`) pins the choice: `graphics` (default), `auto` or `blocks`.
+  `g` in the pane switches it for this plugin load; no background check resets your choice.
 
 `Image` takes at most 2 MiB of PNG: a JPEG, GIF or WebP is converted once, a bigger PNG is shrunk
 until it fits, and hover cards get a copy at most 512 px long. Block pictures are read from a BMP
@@ -92,17 +86,22 @@ permission checks; nothing is written when a check fails, and nothing is deleted
   address is never fetched: it is named instead (`▣ build`).
 - The conversation through `$.session.messages`, when the list opens, after each turn while it is
   open, and once for a resumed conversation's pasted images; a sent prompt's images as it is stored.
-- The draft every 200 ms, and the paste cache `<temp dir>/<project>/<session>/images/`.
+- The draft every 1 s, only in an interactive terminal or after its draft band draws. Unchanged,
+  resolved image tags do not scan files. Missing images get at most five attempts per image-tag
+  list, with one image-folder listing per attempt. To retry after that limit, remove the image
+  tags, wait at least 1 s, and paste again. Polling stops at session end. The paste cache is `<temp dir>/<project>/<session>/images/`.
 - `~/.claude/settings.json` (or the one under `CLAUDE_CONFIG_DIR`) once, for the language.
-- External commands: `id -u`, `sh`, `ps` and `stat` (every 5 s, for the path), `mkdir`, `chmod`, `find`, `head`, `base64`, `mv`, and the
-  converters, arguments passed as arguments, never spliced into shell code.
+- External commands: `id -u` (once if the temp directory is not configured), `sh`, `mkdir`,
+  `chmod`, `find`, `head`, `base64`, `mv`, and converters for private scratch storage and image
+  preparation. Arguments are passed separately, never spliced into shell code. No `ps`, shell
+  `ls`, or terminal-device `stat` commands.
 - No network, no model calls.
 
 ## Options
 
 | Option | Values | Default |
 | --- | --- | --- |
-| `pictures` | `auto`, `graphics`, `blocks` | `auto` |
+| `pictures` | `auto`, `graphics`, `blocks` | `graphics` |
 | `language` | `auto`, `en`, `zh-TW` (auto follows Claude Code's `language`, then `LC_ALL` / `LANG`) | `auto` |
 
 ## Checks

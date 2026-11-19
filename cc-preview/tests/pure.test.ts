@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { parseBmp, quadrants } from '../hooks/blocks'
-import { clientTerminals, drawsGraphics, parseInputTimes, parseProcesses, pathOf } from '../hooks/connection'
+import { drawsGraphics } from '../hooks/connection'
 import { scan } from '../hooks/conversation'
 import { pickLocale } from '../hooks/i18n'
 import { buttonOffsets, cellWidth, fitLabel, keepCenter, zoomLevels, zoomed } from '../hooks/layout'
@@ -158,52 +158,15 @@ describe('zoom', () => {
   })
 })
 
-describe('the path to the screen', () => {
-  // claude in herdr; herdr's server was started by a mosh client long ago, and two clients came since
-  const processes = parseProcesses(
-    [
-      '  100    90 ttys009  claude',
-      '   90    50 ttys009  -zsh',
-      '   50    40 ??       /Users/me/.local/bin/herdr',
-      '   40    30 ttys015  herdr',
-      '   30    20 ttys015  -zsh',
-      '   20     1 ??       mosh-server',
-      '   41    31 ttys022  herdr',
-      '   31    21 ttys022  -zsh',
-      '   21     1 ??       sshd-session: me@ttys022',
-      '   42    32 ttys028  herdr',
-      '   32    22 ttys028  login',
-      '   22     1 ??       /Applications/Ghostty.app/Contents/MacOS/ghostty',
-    ].join('\n'),
-  )
-  const lastTyped = (tty: string) => new Map([['ttys015', 100], ['ttys022', 100], ['ttys028', 100], [tty, 200]])
-
-  test('through a multiplexer, the client typed in last decides', () => {
-    expect(clientTerminals(processes)).toEqual(['ttys015', 'ttys022', 'ttys028'])
-    expect(pathOf(processes, 100, lastTyped('ttys015'))).toEqual({ via: 'mosh', terminal: null })
-    expect(pathOf(processes, 100, lastTyped('ttys022'))).toEqual({ via: 'ssh', terminal: null })
-    expect(pathOf(processes, 100, lastTyped('ttys028'))).toEqual({ via: 'local', terminal: 'ghostty' })
-    expect(parseInputTimes('1760000000 /dev/ttys022\n1759990000 /dev/ttys015\n')).toEqual(
-      new Map([['ttys022', 1760000000], ['ttys015', 1759990000]]),
-    )
-  })
-
-  test('a tmux server reads as tmux, as Linux names it', () => {
-    const linux = parseProcesses('  10     5 ?        tmux: server\n   5     1 ?        sshd\n  11    10 pts/1    bash')
-    expect(linux.map(process => process.name)).toEqual(['tmux', 'sshd', 'bash'])
-  })
-
-  test('kitty graphics only where every hop is known to carry them', () => {
-    const forced = { force: '1', termProgram: 'herdr', term: 'xterm-256color' }
+describe('terminal environment', () => {
+  test('auto uses known terminal support or an explicit force flag, without process discovery', () => {
     const unknown = { force: undefined, termProgram: undefined, term: 'xterm-256color' }
-    const ghostty = { force: undefined, termProgram: 'ghostty', term: 'xterm-ghostty' }
-    expect(drawsGraphics({ via: 'mosh', terminal: null }, forced)).toBe(false)
-    expect(drawsGraphics({ via: 'ssh', terminal: null }, forced)).toBe(true)
-    // Claude Code itself would send none
-    expect(drawsGraphics({ via: 'ssh', terminal: null }, unknown)).toBe(false)
-    expect(drawsGraphics({ via: 'local', terminal: 'ghostty' }, ghostty)).toBe(true)
-    // Forced, but the local terminal can't draw them
-    expect(drawsGraphics({ via: 'local', terminal: 'Terminal' }, forced)).toBe(false)
-    expect(drawsGraphics({ via: 'local', terminal: 'ghostty' }, { ...forced, force: '0' })).toBe(false)
+    expect(drawsGraphics(unknown)).toBe(false)
+    expect(drawsGraphics({ ...unknown, termProgram: 'ghostty' })).toBe(true)
+    expect(drawsGraphics({ ...unknown, term: 'xterm-kitty' })).toBe(true)
+    expect(drawsGraphics({ ...unknown, termProgram: 'Apple_Terminal' })).toBe(false)
+    expect(drawsGraphics({ ...unknown, force: '1' })).toBe(true)
+    expect(drawsGraphics({ ...unknown, force: '0' })).toBe(false)
+    expect(drawsGraphics({ ...unknown, force: 'false' })).toBe(false)
   })
 })

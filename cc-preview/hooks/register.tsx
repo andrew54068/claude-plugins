@@ -4,8 +4,8 @@ import type { Elements, EngineInterface, PluginOptions, Register, RenderElement,
 import type { Artifact, DraftImage, PageView, PictureMode, ZoomView } from '../types'
 import { parseBmp, quadrants } from './blocks'
 import type { Pixels } from './blocks'
-import { clientTerminals, drawsGraphics, parseInputTimes, parseProcesses, pathLabel, pathOf } from './connection'
-import type { Path, TerminalEnv } from './connection'
+import { drawsGraphics } from './connection'
+import type { TerminalEnv } from './connection'
 import { imagesIn, promptImages, scan, shortTool, toolPaths } from './conversation'
 import type { Block, Message, Picture, PromptImages, Words } from './conversation'
 import { drawDocument, paginate, pictureKey } from './document'
@@ -48,7 +48,7 @@ import { basename, cleanPath, folderOf, kindOf, mentionsArtifact, pathsIn, resol
 const PANE = 'cc-preview'
 // Pasting an image raises no prompt.edit (the tag only shows up on the next keystroke),
 // so the draft is polled instead.
-const POLL_MS = 200
+const POLL_MS = 1_000
 // Files checked per scan, so a conversation full of paths can't stall it
 const MAX_STATS = 400
 // A file's existence is trusted this long, since transcript rows draw again and again
@@ -97,54 +97,6 @@ async function settingsLanguage($: EngineInterface): Promise<unknown> {
     return (JSON.parse(await $.fs.read(`${config}/settings.json`)) as { language?: unknown }).language
   } catch {
     return undefined
-  }
-}
-
-// Kitty graphics or characters: looked at again every few seconds, since the person may detach
-// from a multiplexer and attach again over another connection
-const DETECT_MS = 5_000
-// This process (the shell's parent) and every process, in one call
-const PROCESSES = 'echo "$PPID"; ps -axo pid=,ppid=,tty=,comm='
-// When each terminal last had input: BSD stat, else GNU
-const INPUT_TIMES = 'stat -f "%a %N" "$@" 2>/dev/null || stat -c "%X %n" "$@" 2>/dev/null; true'
-
-// A background run that has not finished in this long is taken for lost, and the next one goes
-const STUCK_MS = 10_000
-
-let terminalEnv: TerminalEnv = { force: undefined, termProgram: undefined, term: undefined }
-// What was last found, so a switch made in the pane stands until the path changes
-let detected: string | undefined
-let detectingSince = 0
-
-async function pathNow($: EngineInterface): Promise<Path | null> {
-  const run = await $.process.run(['sh', '-c', PROCESSES], { timeoutMs: 5_000 }).catch(() => null)
-  if (run === null || run.exitCode !== 0 || run.isStdoutTruncated) return null
-  const [start = '', ...rest] = run.stdout.split('\n')
-  const processes = parseProcesses(rest.join('\n'))
-  const terminals = clientTerminals(processes)
-  const times =
-    terminals.length === 0
-      ? null
-      : await $.process.run(['sh', '-c', INPUT_TIMES, 'sh', ...terminals.map(tty => `/dev/${tty}`)], { timeoutMs: 5_000 }).catch(() => null)
-  return pathOf(processes, Number(start.trim()), parseInputTimes(times?.stdout ?? ''))
-}
-
-async function detect($: EngineInterface, option: unknown) {
-  if (Date.now() - detectingSince < STUCK_MS) return
-  detectingSince = Date.now()
-  try {
-    const path = await pathNow($)
-    if (path === null) return
-    const isPinned = option === 'graphics' || option === 'blocks'
-    const look: PictureMode = isPinned ? option : drawsGraphics(path, terminalEnv) ? 'graphics' : 'blocks'
-    const label = pathLabel(path)
-    if (`${label}|${look}` === detected) return
-    detected = `${label}|${look}`
-    note($, `path ${path.via}${path.terminal === null ? '' : ` (${path.terminal})`} -> ${look}${isPinned ? ' (pinned)' : ''}`)
-    await update($, link, () => label)
-    await update($, mode, () => look)
-  } finally {
-    detectingSince = 0
   }
 }
 
@@ -808,30 +760,34 @@ async function imagesDir($: EngineInterface): Promise<string | undefined> {
   return undefined
 }
 
-/** The cached paste for image `n`, whatever its extension (a JPEG paste is `<n>.jpg`). */
-async function cachedFile($: EngineInterface, dir: string | undefined, n: number): Promise<string | null> {
-  if (dir === undefined) return null
-  const entries = await $.fs.list(dir).catch(() => [])
-  const hit = entries.find(entry => entry.kind === 'file' && new RegExp(`^${n}\\.[A-Za-z0-9]+$`).test(entry.name))
-  return hit === undefined ? null : `${dir}/${hit.name}`
-}
-
-// The image numbers last found whole, so an unchanged draft doesn't look again; undefined
-// while one's file is still missing, so the next poll does.
+// A missing paste gets five attempts, not an unbounded directory scan in every session.
+const MAX_DRAFT_ATTEMPTS = 5
 let draftKey: string | undefined
+let attemptedKey: string | undefined
+let draftAttempts = 0
 let written = '[]'
-let checkingSince = 0
+let isChecking = false
 
 async function checkDraft($: EngineInterface) {
-  if (Date.now() - checkingSince < STUCK_MS) return
-  checkingSince = Date.now()
+  if (isChecking) return
+  isChecking = true
   try {
     const numbers = imageNumbers((await $.prompt.read()).text)
     const key = numbers.join(',')
     if (key === draftKey) return
+    if (key !== attemptedKey) {
+      attemptedKey = key
+      draftAttempts = 0
+    }
+    if (draftAttempts >= MAX_DRAFT_ATTEMPTS) return
+    draftAttempts++
     const dir = numbers.length > 0 ? await imagesDir($) : undefined
-    const list: DraftImage[] = []
-    for (const n of numbers) list.push({ n, path: await cachedFile($, dir, n) })
+    // One directory listing per attempt, not one per image.
+    const entries = dir === undefined ? [] : await $.fs.list(dir).catch(() => [])
+    const list: DraftImage[] = numbers.map(n => {
+      const hit = entries.find(entry => entry.kind === 'file' && new RegExp(`^${n}\\.[A-Za-z0-9]+$`).test(entry.name))
+      return { n, path: hit === undefined ? null : `${dir}/${hit.name}` }
+    })
     draftKey = list.every(image => image.path !== null) ? key : undefined
     const json = JSON.stringify(list)
     if (json === written) return
@@ -839,42 +795,47 @@ async function checkDraft($: EngineInterface) {
     note($, `draft ${list.map(image => `#${image.n}=${image.path === null ? 'missing' : 'found'}`).join(' ') || 'empty'}`)
     await update($, draft, () => list)
   } finally {
-    checkingSince = 0
+    isChecking = false
   }
 }
 
 // ── Starting ─────────────────────────────────────────────────────────────────
 
 let isStarted = false
+let draftTimer: ReturnType<EngineInterface['clock']['every']> | undefined
 
-/** The language, what Claude Code was told about the terminal, and a first look at the path. */
+function startDraftPolling($: EngineInterface) {
+  draftTimer ??= $.clock.every(POLL_MS, () => checkDraft($))
+}
+
+/** Reads the language and terminal environment once, without connection discovery. */
 async function configure($: EngineInterface, options: PluginOptions) {
   // An empty LC_ALL means unset to the C library, so it must not hide LANG
   const lcAll = await $.env.get('LC_ALL')
   const envLang = lcAll !== undefined && lcAll !== '' ? lcAll : await $.env.get('LANG')
   strings = stringsFor(pickLocale({ option: options.language, claudeLanguage: await settingsLanguage($), envLang }))
-  terminalEnv = {
+  const terminalEnv: TerminalEnv = {
     force: await $.env.get('CLAUDE_CODE_FORCE_TERMINAL_IMAGES'),
     termProgram: await $.env.get('TERM_PROGRAM'),
     term: await $.env.get('TERM'),
   }
   note($, `env force=${terminalEnv.force ?? '-'} TERM_PROGRAM=${terminalEnv.termProgram ?? '-'} TERM=${terminalEnv.term ?? '-'}`)
-  await detect($, options.pictures)
+  const look: PictureMode = options.pictures === 'auto' ? (drawsGraphics(terminalEnv) ? 'graphics' : 'blocks') : options.pictures === 'blocks' ? 'blocks' : 'graphics'
+  await update($, mode, () => look)
+  await update($, link, () => terminalEnv.termProgram ?? terminalEnv.term ?? 'terminal')
   $.ui.invalidate('ui.render')
 }
 
 /**
- * Starts the background work once per load: the draft poll that feeds the band above the prompt,
- * and the look at the path to the screen. From session.start, and from whichever hook runs first
+ * Reads settings once per load. Draft polling starts only in an interactive terminal
+ * or when its above-prompt band draws. From session.start, and from whichever hook runs first
  * should session.start not get there (it is not seen to run after every mid-session load), so a
  * lost start can't leave the band empty and the pictures in a mode the screen can't show.
  */
 function startBackground($: EngineInterface, options: PluginOptions, isAwaited = false): Promise<void> | undefined {
   if (isStarted) return undefined
   isStarted = true
-  note($, `start from ${isAwaited ? 'session.start' : 'a hook'}`)
-  $.clock.every(POLL_MS, () => checkDraft($))
-  $.clock.every(DETECT_MS, () => detect($, options.pictures))
+  note($, `start from ${isAwaited ? 'session.start' : 'a hook'}; draft=${POLL_MS}ms retries=${MAX_DRAFT_ATTEMPTS} process-scan=off`)
   // session.start is awaited before the first prompt, so the first draw is in the right mode;
   // from any other hook, outside its dispatch, since a draw may not write state
   if (isAwaited) return configure($, options)
@@ -886,6 +847,7 @@ function startBackground($: EngineInterface, options: PluginOptions, isAwaited =
 
 export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
+    if (e.isInteractive && e.surface === 'terminal') startDraftPolling($)
     await startBackground($, options, true)
     // A refused command costs /preview alone, never the rest
     await $.command
@@ -896,6 +858,17 @@ export const register: Register = (on, options) => {
         immediate: true,
       })
       .catch(() => undefined)
+    return next(e)
+  })
+
+  on('session.end', async ($, e, next) => {
+    draftTimer?.cancel()
+    draftTimer = undefined
+    draftKey = undefined
+    attemptedKey = undefined
+    draftAttempts = 0
+    written = '[]'
+    found = undefined
     return next(e)
   })
 
@@ -990,6 +963,7 @@ export const register: Register = (on, options) => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     startBackground($, options)
     if (e.surface !== 'terminal' || e.props.hasSurvey) return next(e)
+    startDraftPolling($)
     const list = await read($, draft)
     if (list.length === 0) return next(e)
     const look = await read($, mode)
